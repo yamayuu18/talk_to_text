@@ -76,7 +76,8 @@ class SpeechRecognizer: ObservableObject {
     
     private func requestMicrophonePermission() {
         // On macOS, microphone permission is handled through system preferences
-        // and entitlements. No runtime request needed like on iOS.
+        // We'll check if audio input is available when we try to start recording
+        print("Microphone permission will be checked during audio engine startup")
     }
     
     func startRecording() {
@@ -97,8 +98,22 @@ class SpeechRecognizer: ObservableObject {
     func stopRecording() {
         guard isRecording else { return }
         
-        audioEngine.stop()
+        // Safely stop audio engine and clean up
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        
+        // Remove tap to prevent crashes
+        let inputNode = audioEngine.inputNode
+        if inputNode.numberOfInputs > 0 {
+            inputNode.removeTap(onBus: 0)
+        }
+        
         recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        
+        recognitionTask?.cancel()
+        recognitionTask = nil
         
         isRecording = false
         delegate?.speechRecognizer(self, didStartRecording: false)
@@ -110,9 +125,17 @@ class SpeechRecognizer: ObservableObject {
             recognitionTask = nil
         }
         
-        // On macOS, AVAudioSession is not available. Audio setup is handled automatically.
+        // Stop any existing audio engine activity
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
         
+        // Check if input node is available (microphone permission)
         let inputNode = audioEngine.inputNode
+        guard inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
+            throw SpeechRecognitionError.microphonePermissionDenied
+        }
         
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
@@ -167,12 +190,25 @@ class SpeechRecognizer: ObservableObject {
         }
         
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
+        
+        // Wrap the tap installation in a try-catch to handle permission issues
+        do {
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+                self?.recognitionRequest?.append(buffer)
+            }
+        } catch {
+            throw SpeechRecognitionError.microphonePermissionDenied
         }
         
-        audioEngine.prepare()
-        try audioEngine.start()
+        // Prepare and start audio engine with error handling
+        do {
+            audioEngine.prepare()
+            try audioEngine.start()
+        } catch {
+            // Clean up on failure
+            inputNode.removeTap(onBus: 0)
+            throw SpeechRecognitionError.microphonePermissionDenied
+        }
         
         isRecording = true
         recognizedText = ""

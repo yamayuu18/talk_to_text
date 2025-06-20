@@ -212,13 +212,30 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     func speechRecognizer(_ recognizer: SpeechRecognizer, didFailWithError error: Error) {
         DispatchQueue.main.async {
             self.isRecording = false
-            self.updateStatus("Error: \(error.localizedDescription)")
+            
+            // Provide specific error messages based on error type
+            var errorMessage = "Error: \(error.localizedDescription)"
+            
+            if let speechError = error as? SpeechRecognitionError {
+                switch speechError {
+                case .microphonePermissionDenied:
+                    errorMessage = "Microphone access denied. Please grant permission in System Settings."
+                case .permissionDenied:
+                    errorMessage = "Speech recognition permission denied. Please enable in System Settings."
+                case .speechRecognizerUnavailable:
+                    errorMessage = "Speech recognition unavailable. Please enable Dictation in System Settings."
+                default:
+                    errorMessage = "Speech recognition error: \(speechError.localizedDescription)"
+                }
+            }
+            
+            self.updateStatus(errorMessage)
             
             if let button = self.statusBarItem.button {
                 button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "Voice to Text")
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 self.updateStatus("Ready")
             }
         }
