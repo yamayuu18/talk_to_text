@@ -19,12 +19,17 @@ class TextInserter: ObservableObject {
     }
     
     func insertText(_ text: String) {
-        guard !text.isEmpty else { return }
+        print("TextInserter.insertText called with: '\(text)' (length: \(text.count))")
+        guard !text.isEmpty else { 
+            print("TextInserter: text is empty, returning")
+            return 
+        }
         
         // Always copy to clipboard first
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        print("TextInserter: Text set to clipboard")
         
         guard hasAccessibilityPermission else {
             print("Accessibility permission not granted - text copied to clipboard only")
@@ -48,6 +53,8 @@ class TextInserter: ObservableObject {
     }
     
     private func insertTextUsingPaste() -> Bool {
+        print("TextInserter: Attempting to paste using Cmd+V")
+        
         // Send Cmd+V to paste the text we already put in clipboard
         guard let keyDownEvent = CGEvent(
             keyboardEventSource: nil,
@@ -58,6 +65,7 @@ class TextInserter: ObservableObject {
             virtualKey: 9, // V key
             keyDown: false
         ) else {
+            print("TextInserter: Failed to create key events for paste")
             return false
         }
         
@@ -69,6 +77,7 @@ class TextInserter: ObservableObject {
         usleep(10000) // 10ms delay
         keyUpEvent.post(tap: .cghidEventTap)
         
+        print("TextInserter: Cmd+V sent successfully")
         return true
     }
     

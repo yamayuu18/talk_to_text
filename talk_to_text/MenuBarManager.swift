@@ -152,6 +152,8 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     }
     
     func speechRecognizer(_ recognizer: SpeechRecognizer, didRecognizeText text: String) {
+        print("MenuBarManager received text: '\(text)' (length: \(text.count))")
+        
         // Check if API key is configured
         let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
         
@@ -162,8 +164,10 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
+                print("Text copied to clipboard: '\(text)'")
                 
                 // Insert into active application
+                print("Calling textInserter.insertText with: '\(text)'")
                 self.textInserter.insertText(text)
                 
                 // Check if accessibility permission is granted for better status message

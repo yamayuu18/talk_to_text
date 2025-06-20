@@ -194,11 +194,14 @@ class SpeechRecognizer: ObservableObject {
                 
                 if isFinal {
                     DispatchQueue.main.async {
-                        if !recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            print("Final recognition result: '\(recognizedText)'")
-                            self.delegate?.speechRecognizer(self, didRecognizeText: recognizedText)
+                        let trimmedText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        print("Final recognition result: '\(recognizedText)' (trimmed: '\(trimmedText)') (length: \(trimmedText.count))")
+                        
+                        if !trimmedText.isEmpty {
+                            print("Sending recognized text to delegate: '\(trimmedText)'")
+                            self.delegate?.speechRecognizer(self, didRecognizeText: trimmedText)
                         } else {
-                            print("Recognition completed but no text was recognized")
+                            print("Recognition completed but no text was recognized (original: '\(recognizedText)')")
                             self.delegate?.speechRecognizer(self, didFailWithError: SpeechRecognitionError.noTextRecognized)
                         }
                         self.stopRecording()
