@@ -6,13 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Development**: `open talk_to_text.xcodeproj` (opens in Xcode for build/run)
 - **CLI Debug Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Debug`
-- **CLI Release Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Release`
+- **CLI Release Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Release` 
 - **Clean Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text clean`
 - **Clear DerivedData**: `rm -rf ~/Library/Developer/Xcode/DerivedData/talk_to_text-*`
+- **Launch Built App**: `open ~/Library/Developer/Xcode/DerivedData/talk_to_text-*/Build/Products/Debug/talk_to_text.app`
 
 ### Build Troubleshooting
 - **File Reference Errors**: Clean DerivedData cache if Xcode references old file names
-- **macOS API Compatibility**: This app uses macOS-specific APIs (Carbon, Accessibility) - iOS frameworks like AVAudioSession are not available
+- **macOS API Compatibility**: This app uses macOS-specific APIs (Carbon, Accessibility) - avoid iOS frameworks like AVAudioSession
+- **Settings Window Warnings**: Use proper SwiftUI Settings scene integration for menu bar apps - avoid SettingsLink warnings
 
 ## Architecture Overview
 
@@ -64,13 +66,23 @@ This is a native macOS menu bar application for speech-to-text conversion with A
 - Real-time shortcut customization with visual feedback
 - API key validation and management
 
-### Permission Requirements
+### Permission Requirements & Configuration Files
 The app requires several macOS permissions managed through entitlements and Info.plist:
-- Microphone access (audio input)
-- Speech recognition
-- Accessibility (for cross-app text insertion)
-- Apple Events (for AppleScript automation)
-- Network client (for Gemini API calls)
+
+**talk_to_text.entitlements:**
+- `com.apple.security.device.microphone` - Audio input for speech recognition
+- `com.apple.security.device.audio-input` - Additional audio access
+- `com.apple.security.automation.apple-events` - AppleScript keystroke automation
+- `com.apple.security.network.client` - Gemini API HTTP requests
+
+**Info.plist permission descriptions:**
+- `NSMicrophoneUsageDescription` - User-facing microphone permission prompt
+- `NSSpeechRecognitionUsageDescription` - Speech recognition permission prompt  
+- `NSAppleEventsUsageDescription` - AppleScript automation permission prompt
+- `LSUIElement: true` - Menu bar app (no dock icon)
+- `LSMinimumSystemVersion: 13.0` - macOS 13.0+ requirement
+
+**Missing Manual Permission:** Accessibility permission must be granted manually in System Settings → Privacy & Security → Accessibility
 
 ### State Management
 - UserDefaults for persistent settings (API keys, shortcuts)
@@ -116,7 +128,24 @@ Each major component defines custom error enums (e.g., GeminiAPIError, SpeechRec
 - **API Testing**: Use Settings panel "Test API Key" button to validate Gemini integration
 - **Permission Testing**: Check System Settings → Privacy & Security for required permissions
 
-### Common Development Issues
-- **Carbon API Deprecation Warnings**: `UTGetOSTypeFromString` warnings are expected - functionality still works
-- **Sendable Protocol Warnings**: Expected in MenuBarManager async closures - does not affect functionality
-- **Text Insertion**: Requires Accessibility permission; use System Settings → Privacy & Security → Accessibility
+### Known Warnings & Issues
+- **Carbon API Deprecation**: `UTGetOSTypeFromString` warnings in GlobalShortcut.swift are expected - functionality still works on macOS 15+
+- **Sendable Protocol**: MenuBarManager async closure warnings are expected - does not affect functionality
+- **SwiftUI Settings**: If you see "Please use SettingsLink for opening the Settings scene" warnings, ensure proper Settings scene integration in menu bar apps
+
+### Menu Bar App Settings Pattern
+For menu bar apps, open Settings using version-specific selectors:
+```swift
+// In MenuBarManager.swift
+if #available(macOS 14.0, *) {
+    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+} else if #available(macOS 13.0, *) {
+    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)  
+}
+```
+
+### File Naming Consistency
+All files use `talk_to_text` naming (not `VoiceToText`). When creating new files, follow this pattern:
+- Project: `talk_to_text.xcodeproj`
+- Bundle ID: `com.voicetotext.app` 
+- Display name: "Talk to Text"

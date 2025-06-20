@@ -6,6 +6,7 @@ class MenuBarManager: ObservableObject {
     private var speechRecognizer: SpeechRecognizer!
     private var globalShortcut: GlobalShortcut!
     private var textInserter: TextInserter!
+    private var settingsWindowController: NSWindowController?
     
     @Published var isRecording = false
     @Published var statusText = "Ready"
@@ -78,11 +79,40 @@ class MenuBarManager: ObservableObject {
     }
     
     @objc private func openSettings() {
-        // For SwiftUI Settings scene, use the modern approach
-        if #available(macOS 13.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        // Create or show settings window using NSWindowController
+        DispatchQueue.main.async { [weak self] in
+            if let settingsWindowController = self?.settingsWindowController {
+                // Window already exists, just bring it to front
+                settingsWindowController.window?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            } else {
+                // Create new settings window
+                let settingsView = SettingsView()
+                let hostingController = NSHostingController(rootView: settingsView)
+                
+                let window = NSWindow(
+                    contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                    backing: .buffered,
+                    defer: false
+                )
+                
+                window.title = "Settings"
+                window.contentViewController = hostingController
+                window.isReleasedWhenClosed = false
+                window.level = .normal
+                window.minSize = NSSize(width: 500, height: 400)
+                window.maxSize = NSSize(width: 900, height: 700)
+                window.setFrame(NSRect(x: 0, y: 0, width: 600, height: 500), display: false)
+                window.center()
+                
+                let windowController = NSWindowController(window: window)
+                self?.settingsWindowController = windowController
+                
+                windowController.showWindow(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
-        NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc private func quitApp() {
@@ -114,34 +144,65 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     }
     
     func speechRecognizer(_ recognizer: SpeechRecognizer, didRecognizeText text: String) {
-        updateStatus("Processing...")
+        // Check if API key is configured
+        let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
         
-        Task {
-            do {
-                let processedText = try await GeminiAPI.shared.processText(text)
+        if apiKey.isEmpty {
+            // No API key - use raw speech recognition text
+            DispatchQueue.main.async {
+                // Copy to clipboard
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
                 
-                DispatchQueue.main.async {
-                    // Copy to clipboard
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(processedText, forType: .string)
-                    
-                    // Insert into active application
-                    self.textInserter.insertText(processedText)
-                    
-                    self.updateStatus("Text inserted!")
-                    
-                    // Reset status after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        self.updateStatus("Ready")
-                    }
+                // Insert into active application
+                self.textInserter.insertText(text)
+                
+                self.updateStatus("Raw text inserted! (Set API key for AI processing)")
+                
+                // Reset status after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    self.updateStatus("Ready")
                 }
-            } catch {
-                DispatchQueue.main.async {
-                    self.updateStatus("Error: \(error.localizedDescription)")
+            }
+        } else {
+            // API key available - process with Gemini
+            updateStatus("Processing with AI...")
+            
+            Task {
+                do {
+                    let processedText = try await GeminiAPI.shared.processText(text)
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        self.updateStatus("Ready")
+                    DispatchQueue.main.async {
+                        // Copy to clipboard
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(processedText, forType: .string)
+                        
+                        // Insert into active application
+                        self.textInserter.insertText(processedText)
+                        
+                        self.updateStatus("AI-processed text inserted!")
+                        
+                        // Reset status after 2 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            self.updateStatus("Ready")
+                        }
+                    }
+                } catch {
+                    // Fallback to raw text if API processing fails
+                    DispatchQueue.main.async {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(text, forType: .string)
+                        
+                        self.textInserter.insertText(text)
+                        
+                        self.updateStatus("API error - used raw text: \(error.localizedDescription)")
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            self.updateStatus("Ready")
+                        }
                     }
                 }
             }

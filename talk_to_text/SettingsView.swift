@@ -77,47 +77,37 @@ struct SettingsView: View {
                 Text("Global Shortcut")
                     .font(.headline)
                 
-                Text("Choose a keyboard shortcut to start/stop recording")
+                Text("Press keys to set your recording shortcut")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
             VStack(alignment: .leading, spacing: 12) {
-                Text("Modifier Keys")
+                Text("Shortcut Recording")
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(ModifierKey.allCases, id: \.self) { modifier in
-                        HStack {
-                            Button(action: {
-                                toggleModifier(modifier)
-                            }) {
-                                HStack {
-                                    Image(systemName: selectedModifiers.contains(modifier) ? "checkmark.square" : "square")
-                                    Text(modifier.displayName)
-                                }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Spacer()
-                        }
+                Button(action: {
+                    isWaitingForKeyPress.toggle()
+                }) {
+                    HStack {
+                        Image(systemName: isWaitingForKeyPress ? "circle.fill" : "circle")
+                            .foregroundColor(isWaitingForKeyPress ? .red : .blue)
+                        Text(isWaitingForKeyPress ? "Press keys now..." : "Click to record shortcut")
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(isWaitingForKeyPress ? Color.red.opacity(0.1) : Color.blue.opacity(0.1))
+                    .cornerRadius(8)
                 }
-            }
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Key")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                .buttonStyle(PlainButtonStyle())
                 
-                Picker("Key", selection: $selectedKey) {
-                    ForEach(availableKeys, id: \.self) { key in
-                        Text(key).tag(key)
-                    }
+                if isWaitingForKeyPress {
+                    Text("Press your desired key combination now")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .italic()
                 }
-                .pickerStyle(MenuPickerStyle())
-                .frame(maxWidth: 200, alignment: .leading)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -125,12 +115,14 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text(currentShortcutString)
-                    .font(.system(.body, design: .monospaced))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                Text(currentShortcutString.isEmpty ? "No shortcut set" : currentShortcutString)
+                    .font(.system(.title2, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(6)
+                    .cornerRadius(8)
+                    .foregroundColor(currentShortcutString.isEmpty ? .secondary : .primary)
             }
             
             HStack {
@@ -149,6 +141,15 @@ struct SettingsView: View {
             Spacer()
         }
         .padding()
+        .background(ShortcutCaptureView(
+            isCapturing: $isWaitingForKeyPress,
+            onShortcutCaptured: { modifiers, keyCode in
+                selectedModifiers = modifiers
+                selectedKey = KeyCodeHelper.keyFromCode(keyCode) ?? "Space"
+                updateStoredShortcut()
+                applyShortcut()
+            }
+        ))
         .onChange(of: selectedModifiers) { _ in updateStoredShortcut() }
         .onChange(of: selectedKey) { _ in updateStoredShortcut() }
     }
@@ -265,5 +266,86 @@ struct KeyCodeHelper {
     
     static func keyFromCode(_ code: Int) -> String? {
         return reverseKeyMap[code]
+    }
+}
+
+struct ShortcutCaptureView: NSViewRepresentable {
+    @Binding var isCapturing: Bool
+    let onShortcutCaptured: (Set<ModifierKey>, Int) -> Void
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = KeyCaptureView()
+        view.delegate = context.coordinator
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let captureView = nsView as? KeyCaptureView {
+            captureView.isCapturing = isCapturing
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, KeyCaptureDelegate {
+        let parent: ShortcutCaptureView
+        
+        init(_ parent: ShortcutCaptureView) {
+            self.parent = parent
+        }
+        
+        func keyCaptured(modifiers: Set<ModifierKey>, keyCode: Int) {
+            parent.isCapturing = false
+            parent.onShortcutCaptured(modifiers, keyCode)
+        }
+    }
+}
+
+protocol KeyCaptureDelegate: AnyObject {
+    func keyCaptured(modifiers: Set<ModifierKey>, keyCode: Int)
+}
+
+class KeyCaptureView: NSView {
+    weak var delegate: KeyCaptureDelegate?
+    var isCapturing = false {
+        didSet {
+            if isCapturing {
+                self.window?.makeFirstResponder(self)
+            }
+        }
+    }
+    
+    override var acceptsFirstResponder: Bool { return true }
+    
+    override func keyDown(with event: NSEvent) {
+        guard isCapturing else {
+            super.keyDown(with: event)
+            return
+        }
+        
+        // Convert NSEvent modifiers to our ModifierKey set
+        var modifiers: Set<ModifierKey> = []
+        let flags = event.modifierFlags
+        
+        if flags.contains(.command) { modifiers.insert(.command) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        
+        // Require at least one modifier for global shortcuts
+        guard !modifiers.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        
+        let keyCode = Int(event.keyCode)
+        delegate?.keyCaptured(modifiers: modifiers, keyCode: keyCode)
+    }
+    
+    override func flagsChanged(with event: NSEvent) {
+        // Handle modifier-only combinations if needed
+        super.flagsChanged(with: event)
     }
 }
