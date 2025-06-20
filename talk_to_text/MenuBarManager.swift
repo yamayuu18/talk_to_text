@@ -46,6 +46,10 @@ class MenuBarManager: ObservableObject {
         settingsMenuItem.target = self
         menu.addItem(settingsMenuItem)
         
+        let accessibilityMenuItem = NSMenuItem(title: "Grant Accessibility Permission", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        accessibilityMenuItem.target = self
+        menu.addItem(accessibilityMenuItem)
+        
         let quitMenuItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitMenuItem.target = self
         menu.addItem(quitMenuItem)
@@ -115,6 +119,10 @@ class MenuBarManager: ObservableObject {
         }
     }
     
+    @objc private func openAccessibilitySettings() {
+        textInserter.openAccessibilitySettings()
+    }
+    
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
     }
@@ -158,7 +166,12 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 // Insert into active application
                 self.textInserter.insertText(text)
                 
-                self.updateStatus("Raw text inserted! (Set API key for AI processing)")
+                // Check if accessibility permission is granted for better status message
+                if self.textInserter.hasAccessibilityPermission {
+                    self.updateStatus("Raw text inserted! (Set API key for AI processing)")
+                } else {
+                    self.updateStatus("Text copied to clipboard! Grant accessibility permission to auto-paste")
+                }
                 
                 // Reset status after 3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -182,7 +195,12 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                         // Insert into active application
                         self.textInserter.insertText(processedText)
                         
-                        self.updateStatus("AI-processed text inserted!")
+                        // Check if accessibility permission is granted for better status message
+                        if self.textInserter.hasAccessibilityPermission {
+                            self.updateStatus("AI-processed text inserted!")
+                        } else {
+                            self.updateStatus("AI text copied to clipboard! Grant accessibility permission to auto-paste")
+                        }
                         
                         // Reset status after 2 seconds
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -224,6 +242,8 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                     errorMessage = "Speech recognition permission denied. Please enable in System Settings."
                 case .speechRecognizerUnavailable:
                     errorMessage = "Speech recognition unavailable. Please enable Dictation in System Settings."
+                case .audioEngineError:
+                    errorMessage = "Audio engine failed. Please try again or check microphone settings."
                 default:
                     errorMessage = "Speech recognition error: \(speechError.localizedDescription)"
                 }

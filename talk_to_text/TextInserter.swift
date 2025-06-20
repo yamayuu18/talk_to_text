@@ -19,21 +19,57 @@ class TextInserter: ObservableObject {
     }
     
     func insertText(_ text: String) {
+        guard !text.isEmpty else { return }
+        
+        // Always copy to clipboard first
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        
         guard hasAccessibilityPermission else {
-            print("Accessibility permission not granted")
+            print("Accessibility permission not granted - text copied to clipboard only")
+            // Show system prompt to grant permission
             requestAccessibilityPermission()
             return
         }
         
-        guard !text.isEmpty else { return }
+        // Method 1: Try paste operation (most reliable)
+        if insertTextUsingPaste() {
+            return
+        }
         
-        // Method 1: Try using CGEvent to simulate typing
+        // Method 2: Try using CGEvent to simulate typing
         if insertTextUsingCGEvent(text) {
             return
         }
         
-        // Method 2: Fallback to AppleScript
+        // Method 3: Fallback to AppleScript
         insertTextUsingAppleScript(text)
+    }
+    
+    private func insertTextUsingPaste() -> Bool {
+        // Send Cmd+V to paste the text we already put in clipboard
+        guard let keyDownEvent = CGEvent(
+            keyboardEventSource: nil,
+            virtualKey: 9, // V key
+            keyDown: true
+        ), let keyUpEvent = CGEvent(
+            keyboardEventSource: nil,
+            virtualKey: 9, // V key
+            keyDown: false
+        ) else {
+            return false
+        }
+        
+        // Set Command modifier
+        keyDownEvent.flags = .maskCommand
+        keyUpEvent.flags = .maskCommand
+        
+        keyDownEvent.post(tap: .cghidEventTap)
+        usleep(10000) // 10ms delay
+        keyUpEvent.post(tap: .cghidEventTap)
+        
+        return true
     }
     
     private func insertTextUsingCGEvent(_ text: String) -> Bool {

@@ -204,10 +204,19 @@ class SpeechRecognizer: ObservableObject {
         do {
             audioEngine.prepare()
             try audioEngine.start()
-        } catch {
+        } catch let error as NSError {
             // Clean up on failure
             inputNode.removeTap(onBus: 0)
-            throw SpeechRecognitionError.microphonePermissionDenied
+            
+            // Handle specific audio errors
+            if error.code == -10877 {
+                // kAudioUnitErr_CannotDoInCurrentContext
+                print("Audio engine error -10877: Cannot start in current context, retrying...")
+                throw SpeechRecognitionError.audioEngineError
+            } else {
+                print("Audio engine start failed with error: \(error)")
+                throw SpeechRecognitionError.microphonePermissionDenied
+            }
         }
         
         isRecording = true
@@ -229,6 +238,7 @@ enum SpeechRecognitionError: LocalizedError {
     case recognitionRequestFailed
     case speechRecognizerUnavailable
     case dictationNotConfigured
+    case audioEngineError
     
     var errorDescription: String? {
         switch self {
@@ -242,6 +252,8 @@ enum SpeechRecognitionError: LocalizedError {
             return "Speech recognizer is not available for Japanese locale. Please enable Dictation in System Settings > Keyboard > Dictation and download Japanese language support."
         case .dictationNotConfigured:
             return "Dictation is not properly configured. Please go to System Settings > Keyboard > Dictation and ensure it's enabled with Japanese language support downloaded."
+        case .audioEngineError:
+            return "Audio engine failed to start. Please try again or restart the application."
         }
     }
 }
