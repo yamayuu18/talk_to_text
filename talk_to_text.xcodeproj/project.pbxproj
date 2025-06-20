@@ -20,7 +20,7 @@
 
 /* Begin PBXFileReference section */
 		A100000100000000000000008 /* talk_to_text.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = talk_to_text.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1000001000000000000000B /* talk_to_textApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = talk_to_textApp.swift; sourceTree = "<group>"; };
+		A1000001000000000000000B /* TalkToTextApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkToTextApp.swift; sourceTree = "<group>"; };
 		A1000001000000000000000D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000001000000000000000F /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
 		A1000001000000000000001B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
