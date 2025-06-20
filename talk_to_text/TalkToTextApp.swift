@@ -9,6 +9,7 @@ struct TalkToTextApp: App {
             SettingsView()
                 .frame(width: 450, height: 300)
         }
+        .windowResizability(.contentSize)
     }
 }
 

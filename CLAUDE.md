@@ -4,10 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build/Run/Test Commands
 
-- Build and run: `open talk_to_text.xcodeproj` (opens in Xcode for build/run)
-- CLI build: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Release`
-- Debug build: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Debug`
-- Clean build: Select Product > Clean Build Folder in Xcode
+- **Development**: `open talk_to_text.xcodeproj` (opens in Xcode for build/run)
+- **CLI Debug Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Debug`
+- **CLI Release Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text -configuration Release`
+- **Clean Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text clean`
+- **Clear DerivedData**: `rm -rf ~/Library/Developer/Xcode/DerivedData/talk_to_text-*`
+
+### Build Troubleshooting
+- **File Reference Errors**: Clean DerivedData cache if Xcode references old file names
+- **macOS API Compatibility**: This app uses macOS-specific APIs (Carbon, Accessibility) - iOS frameworks like AVAudioSession are not available
 
 ## Architecture Overview
 
@@ -92,3 +97,26 @@ Gemini API keys are stored in UserDefaults (not Keychain). For production apps, 
 
 ### Error Handling Patterns
 Each major component defines custom error enums (e.g., GeminiAPIError, SpeechRecognitionError) with localized descriptions for user-facing error messages.
+
+## Development Setup & Configuration
+
+### Required Setup Steps
+1. **Gemini API Key**: Obtain from [Google AI Studio](https://aistudio.google.com/) and configure in app settings
+2. **macOS Permissions**: App requires microphone, speech recognition, accessibility, and Apple Events permissions
+3. **Minimum macOS**: 13.0+ (defined in deployment target)
+4. **Code Signing**: Uses automatic signing - no developer team configuration required for local development
+
+### Key UserDefaults Keys
+- `"geminiAPIKey"`: Stores Gemini API key
+- `"shortcutModifiers"`: Global shortcut modifier keys (as integer bitmask)
+- `"shortcutKeyCode"`: Global shortcut key code
+
+### Testing the Application
+- **Manual Testing**: Build and run through Xcode, trigger shortcut (⌘+⇧+Space) to test recording workflow
+- **API Testing**: Use Settings panel "Test API Key" button to validate Gemini integration
+- **Permission Testing**: Check System Settings → Privacy & Security for required permissions
+
+### Common Development Issues
+- **Carbon API Deprecation Warnings**: `UTGetOSTypeFromString` warnings are expected - functionality still works
+- **Sendable Protocol Warnings**: Expected in MenuBarManager async closures - does not affect functionality
+- **Text Insertion**: Requires Accessibility permission; use System Settings → Privacy & Security → Accessibility
