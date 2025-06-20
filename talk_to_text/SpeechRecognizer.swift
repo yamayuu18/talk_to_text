@@ -23,6 +23,7 @@ class SpeechRecognizer: ObservableObject {
     
     private var audioEngineRetryCount = 0
     private let maxRetries = 3
+    private var lastPartialResult = "" // Store last partial result as fallback
     
     init() {
         // Suppress console logs for known framework issues
@@ -192,22 +193,41 @@ class SpeechRecognizer: ObservableObject {
                 self.recognizedText = recognizedText
                 isFinal = result.isFinal
                 
+                // Additional debugging for transcription details
+                let segments = result.bestTranscription.segments
+                print("Transcription segments count: \(segments.count)")
+                for (i, segment) in segments.enumerated() {
+                    print("Segment \(i): '\(segment.substring)' (confidence: \(segment.confidence))")
+                }
+                
                 if isFinal {
                     DispatchQueue.main.async {
                         let trimmedText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
                         print("Final recognition result: '\(recognizedText)' (trimmed: '\(trimmedText)') (length: \(trimmedText.count))")
                         
+                        // Use fallback if final result is empty but we had partial results
+                        let textToUse: String
                         if !trimmedText.isEmpty {
-                            print("Sending recognized text to delegate: '\(trimmedText)'")
-                            self.delegate?.speechRecognizer(self, didRecognizeText: trimmedText)
+                            textToUse = trimmedText
+                        } else if !self.lastPartialResult.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            textToUse = self.lastPartialResult.trimmingCharacters(in: .whitespacesAndNewlines)
+                            print("Final result empty, using last partial result: '\(textToUse)'")
                         } else {
-                            print("Recognition completed but no text was recognized (original: '\(recognizedText)')")
+                            textToUse = ""
+                        }
+                        
+                        if !textToUse.isEmpty {
+                            print("Sending recognized text to delegate: '\(textToUse)'")
+                            self.delegate?.speechRecognizer(self, didRecognizeText: textToUse)
+                        } else {
+                            print("Recognition completed but no text was recognized (original: '\(recognizedText)', lastPartial: '\(self.lastPartialResult)')")
                             self.delegate?.speechRecognizer(self, didFailWithError: SpeechRecognitionError.noTextRecognized)
                         }
                         self.stopRecording()
                     }
                 } else if !recognizedText.isEmpty {
-                    // Log partial results for debugging
+                    // Store partial result as fallback
+                    self.lastPartialResult = recognizedText
                     print("Partial recognition: '\(recognizedText)'")
                 }
             }
@@ -271,6 +291,7 @@ class SpeechRecognizer: ObservableObject {
         
         isRecording = true
         recognizedText = ""
+        lastPartialResult = "" // Reset fallback text
         delegate?.speechRecognizer(self, didStartRecording: true)
         
         // Auto-stop after 30 seconds
