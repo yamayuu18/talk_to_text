@@ -38,7 +38,7 @@ class TextInserter: ObservableObject {
     
     private func insertTextUsingCGEvent(_ text: String) -> Bool {
         // First, get the current focused element
-        guard let focusedApp = getFocusedApplication() else {
+        guard getFocusedApplication() != nil else {
             return false
         }
         
@@ -60,7 +60,7 @@ class TextInserter: ObservableObject {
         
         let result = AXUIElementCopyAttributeValue(
             systemWideElement,
-            kAXFocusedApplicationAttribute,
+            kAXFocusedApplicationAttribute as CFString,
             &focusedAppValue
         )
         
@@ -148,13 +148,13 @@ class TextInserter: ObservableObject {
         for modifier in modifiers {
             switch modifier {
             case .command:
-                carbonModifiers |= UInt32(kCGEventFlagMaskCommand)
+                carbonModifiers |= UInt32(CGEventFlags.maskCommand.rawValue)
             case .option:
-                carbonModifiers |= UInt32(kCGEventFlagMaskAlternate)
+                carbonModifiers |= UInt32(CGEventFlags.maskAlternate.rawValue)
             case .control:
-                carbonModifiers |= UInt32(kCGEventFlagMaskControl)
+                carbonModifiers |= UInt32(CGEventFlags.maskControl.rawValue)
             case .shift:
-                carbonModifiers |= UInt32(kCGEventFlagMaskShift)
+                carbonModifiers |= UInt32(CGEventFlags.maskShift.rawValue)
             }
         }
         

@@ -57,12 +57,12 @@ class GlobalShortcut: ObservableObject {
     private func registerHotKey() {
         guard eventHandler == nil else { return }
         
-        let eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
         
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { (_, event, userData) -> OSStatus in
-                guard let userData = userData else { return eventNotHandledErr }
+                guard let userData = userData else { return OSStatus(eventNotHandledErr) }
                 
                 let globalShortcut = Unmanaged<GlobalShortcut>.fromOpaque(userData).takeUnretainedValue()
                 
@@ -81,10 +81,10 @@ class GlobalShortcut: ObservableObject {
                     DispatchQueue.main.async {
                         globalShortcut.delegate?.globalShortcutPressed()
                     }
-                    return noErr
+                    return OSStatus(noErr)
                 }
                 
-                return eventNotHandledErr
+                return OSStatus(eventNotHandledErr)
             },
             1,
             &eventType,

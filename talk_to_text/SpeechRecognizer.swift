@@ -45,16 +45,8 @@ class SpeechRecognizer: ObservableObject {
     }
     
     private func requestMicrophonePermission() {
-        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
-            DispatchQueue.main.async {
-                if !granted {
-                    self?.delegate?.speechRecognizer(
-                        self!,
-                        didFailWithError: SpeechRecognitionError.microphonePermissionDenied
-                    )
-                }
-            }
-        }
+        // On macOS, microphone permission is handled through system preferences
+        // and entitlements. No runtime request needed like on iOS.
     }
     
     func startRecording() {
@@ -88,9 +80,7 @@ class SpeechRecognizer: ObservableObject {
             recognitionTask = nil
         }
         
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        // On macOS, AVAudioSession is not available. Audio setup is handled automatically.
         
         let inputNode = audioEngine.inputNode
         
