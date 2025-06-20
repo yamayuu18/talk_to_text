@@ -244,6 +244,8 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                     errorMessage = "Speech recognition unavailable. Please enable Dictation in System Settings."
                 case .audioEngineError:
                     errorMessage = "Audio engine failed. Please try again or check microphone settings."
+                case .noTextRecognized:
+                    errorMessage = "No speech detected. Please speak clearly and try again."
                 default:
                     errorMessage = "Speech recognition error: \(speechError.localizedDescription)"
                 }

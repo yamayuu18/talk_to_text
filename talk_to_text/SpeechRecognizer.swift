@@ -21,6 +21,9 @@ class SpeechRecognizer: ObservableObject {
     @Published var recognizedText = ""
     @Published var hasPermission = false
     
+    private var audioEngineRetryCount = 0
+    private let maxRetries = 3
+    
     init() {
         // Suppress console logs for known framework issues
         suppressSystemLogs()
@@ -88,8 +91,25 @@ class SpeechRecognizer: ObservableObject {
         
         guard !isRecording else { return }
         
+        audioEngineRetryCount = 0
+        attemptStartRecording()
+    }
+    
+    private func attemptStartRecording() {
         do {
             try startRecognition()
+        } catch let error as SpeechRecognitionError {
+            if case .audioEngineError = error, audioEngineRetryCount < maxRetries {
+                audioEngineRetryCount += 1
+                print("Audio engine failed, retrying... (\(audioEngineRetryCount)/\(maxRetries))")
+                
+                // Wait a bit before retrying
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.attemptStartRecording()
+                }
+            } else {
+                delegate?.speechRecognizer(self, didFailWithError: error)
+            }
         } catch {
             delegate?.speechRecognizer(self, didFailWithError: error)
         }
@@ -125,14 +145,21 @@ class SpeechRecognizer: ObservableObject {
             recognitionTask = nil
         }
         
-        // Stop any existing audio engine activity
+        // Stop any existing audio engine activity and reset
         if audioEngine.isRunning {
             audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
         }
         
-        // Check if input node is available (microphone permission)
+        // Remove existing taps safely
         let inputNode = audioEngine.inputNode
+        if inputNode.numberOfInputs > 0 {
+            inputNode.removeTap(onBus: 0)
+        }
+        
+        // Reset audio engine to clear any problematic state
+        audioEngine.reset()
+        
+        // Check if input node is available (microphone permission)
         guard inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
             throw SpeechRecognitionError.microphonePermissionDenied
         }
@@ -167,9 +194,18 @@ class SpeechRecognizer: ObservableObject {
                 
                 if isFinal {
                     DispatchQueue.main.async {
-                        self.delegate?.speechRecognizer(self, didRecognizeText: recognizedText)
+                        if !recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            print("Final recognition result: '\(recognizedText)'")
+                            self.delegate?.speechRecognizer(self, didRecognizeText: recognizedText)
+                        } else {
+                            print("Recognition completed but no text was recognized")
+                            self.delegate?.speechRecognizer(self, didFailWithError: SpeechRecognitionError.noTextRecognized)
+                        }
                         self.stopRecording()
                     }
+                } else if !recognizedText.isEmpty {
+                    // Log partial results for debugging
+                    print("Partial recognition: '\(recognizedText)'")
                 }
             }
             
@@ -202,19 +238,30 @@ class SpeechRecognizer: ObservableObject {
         
         // Prepare and start audio engine with error handling
         do {
+            // Give the system a moment to settle after reset
+            usleep(100000) // 100ms delay
+            
             audioEngine.prepare()
+            
+            // Another small delay before starting
+            usleep(50000) // 50ms delay
+            
             try audioEngine.start()
+            
+            print("Audio engine started successfully")
         } catch let error as NSError {
             // Clean up on failure
-            inputNode.removeTap(onBus: 0)
+            if inputNode.numberOfInputs > 0 {
+                inputNode.removeTap(onBus: 0)
+            }
             
             // Handle specific audio errors
             if error.code == -10877 {
                 // kAudioUnitErr_CannotDoInCurrentContext
-                print("Audio engine error -10877: Cannot start in current context, retrying...")
+                print("Audio engine error -10877: Cannot start in current context")
                 throw SpeechRecognitionError.audioEngineError
             } else {
-                print("Audio engine start failed with error: \(error)")
+                print("Audio engine start failed with error: \(error.code) - \(error.localizedDescription)")
                 throw SpeechRecognitionError.microphonePermissionDenied
             }
         }
@@ -239,6 +286,7 @@ enum SpeechRecognitionError: LocalizedError {
     case speechRecognizerUnavailable
     case dictationNotConfigured
     case audioEngineError
+    case noTextRecognized
     
     var errorDescription: String? {
         switch self {
@@ -254,6 +302,8 @@ enum SpeechRecognitionError: LocalizedError {
             return "Dictation is not properly configured. Please go to System Settings > Keyboard > Dictation and ensure it's enabled with Japanese language support downloaded."
         case .audioEngineError:
             return "Audio engine failed to start. Please try again or restart the application."
+        case .noTextRecognized:
+            return "No speech was detected. Please speak clearly and try again."
         }
     }
 }
