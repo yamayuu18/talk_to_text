@@ -38,12 +38,14 @@ class AIServiceManager: ObservableObject {
     }
     
     private init() {
+        // Initialize with default values first
+        self.selectedProvider = .gemini
+        self.selectedModel = .gemini2_5FlashLite
+        
         // Load saved preferences
         if let providerString = UserDefaults.standard.string(forKey: "selectedAIProvider"),
            let provider = AIProvider(rawValue: providerString) {
             selectedProvider = provider
-        } else {
-            selectedProvider = .gemini // Default to Gemini
         }
         
         if let modelString = UserDefaults.standard.string(forKey: "selectedAIModel"),

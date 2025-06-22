@@ -16,6 +16,11 @@
 		A1000001000000000000001A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001000000000000001B /* SettingsView.swift */; };
 		A1000001000000000000001C /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001000000000000001D /* SpeechRecognizer.swift */; };
 		A1000001000000000000001E /* GeminiAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001000000000000001F /* GeminiAPI.swift */; };
+		A100000100000000000000030 /* AIServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000031 /* AIServiceProtocol.swift */; };
+		A100000100000000000000032 /* AIServiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000033 /* AIServiceManager.swift */; };
+		A100000100000000000000034 /* GeminiAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000035 /* GeminiAPIService.swift */; };
+		A100000100000000000000036 /* OpenAIAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000037 /* OpenAIAPIService.swift */; };
+		A100000100000000000000038 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000039 /* KeychainHelper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +35,11 @@
 		A1000001000000000000001B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000001000000000000001D /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
 		A1000001000000000000001F /* GeminiAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAPI.swift; sourceTree = "<group>"; };
+		A100000100000000000000031 /* AIServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServiceProtocol.swift; sourceTree = "<group>"; };
+		A100000100000000000000033 /* AIServiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServiceManager.swift; sourceTree = "<group>"; };
+		A100000100000000000000035 /* GeminiAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAPIService.swift; sourceTree = "<group>"; };
+		A100000100000000000000037 /* OpenAIAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIAPIService.swift; sourceTree = "<group>"; };
+		A100000100000000000000039 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +62,11 @@
 				A1000001000000000000001B /* SettingsView.swift */,
 				A1000001000000000000001D /* SpeechRecognizer.swift */,
 				A1000001000000000000001F /* GeminiAPI.swift */,
+				A100000100000000000000031 /* AIServiceProtocol.swift */,
+				A100000100000000000000033 /* AIServiceManager.swift */,
+				A100000100000000000000035 /* GeminiAPIService.swift */,
+				A100000100000000000000037 /* OpenAIAPIService.swift */,
+				A100000100000000000000039 /* KeychainHelper.swift */,
 				A100000100000000000000021 /* GlobalShortcut.swift */,
 				A100000100000000000000023 /* TextInserter.swift */,
 				A100000100000000000000025 /* Assets.xcassets */,
@@ -143,6 +158,11 @@
 				A1000001000000000000001A /* SettingsView.swift in Sources */,
 				A1000001000000000000001C /* SpeechRecognizer.swift in Sources */,
 				A1000001000000000000001E /* GeminiAPI.swift in Sources */,
+				A100000100000000000000030 /* AIServiceProtocol.swift in Sources */,
+				A100000100000000000000032 /* AIServiceManager.swift in Sources */,
+				A100000100000000000000034 /* GeminiAPIService.swift in Sources */,
+				A100000100000000000000036 /* OpenAIAPIService.swift in Sources */,
+				A100000100000000000000038 /* KeychainHelper.swift in Sources */,
 				A100000100000000000000020 /* GlobalShortcut.swift in Sources */,
 				A100000100000000000000022 /* TextInserter.swift in Sources */,
 			);
