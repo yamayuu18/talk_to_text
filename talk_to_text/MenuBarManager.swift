@@ -8,6 +8,9 @@ class MenuBarManager: ObservableObject {
     private var textInserter: TextInserter!
     private var settingsWindowController: NSWindowController?
     
+    // Track the app that was active before speech recognition
+    private var previousActiveApp: NSRunningApplication?
+    
     @Published var isRecording = false
     @Published var statusText = "Ready"
     
@@ -46,7 +49,7 @@ class MenuBarManager: ObservableObject {
         settingsMenuItem.target = self
         menu.addItem(settingsMenuItem)
         
-        let accessibilityMenuItem = NSMenuItem(title: "Grant Accessibility Permission", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        let accessibilityMenuItem = NSMenuItem(title: "Accessibility Setup", action: #selector(handleAccessibilitySetup), keyEquivalent: "")
         accessibilityMenuItem.target = self
         menu.addItem(accessibilityMenuItem)
         
@@ -75,6 +78,8 @@ class MenuBarManager: ObservableObject {
     }
     
     private func startRecording() {
+        // Remember the currently active app before starting recording
+        rememberCurrentActiveApp()
         speechRecognizer.startRecording()
     }
     
@@ -119,12 +124,102 @@ class MenuBarManager: ObservableObject {
         }
     }
     
-    @objc private func openAccessibilitySettings() {
-        textInserter.openAccessibilitySettings()
+    @objc private func handleAccessibilitySetup() {
+        // First check current permission status
+        textInserter.checkAccessibilityPermission()
+        
+        if textInserter.hasAccessibilityPermission {
+            // Permission already granted
+            updateStatus("✅ Accessibility permission is already granted!")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.updateStatus("Ready")
+            }
+        } else {
+            // Permission not granted - help user set it up
+            print("\n=== Accessibility Setup Required ===")
+            print("Auto-paste requires accessibility permission.")
+            print("Opening System Settings for you...")
+            
+            // Try to open settings
+            textInserter.openAccessibilitySettings()
+            
+            // Show helpful status message
+            updateStatus("⚠️ Open System Settings → Privacy & Security → Accessibility")
+            
+            // Check again after some time
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                self.textInserter.checkAccessibilityPermission()
+                if self.textInserter.hasAccessibilityPermission {
+                    self.updateStatus("✅ Permission granted! Auto-paste ready")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        self.updateStatus("Ready")
+                    }
+                } else {
+                    self.updateStatus("❌ Still need accessibility permission for auto-paste")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        self.updateStatus("Ready")
+                    }
+                }
+            }
+        }
     }
     
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+    
+    // MARK: - App Focus Management
+    
+    private func rememberCurrentActiveApp() {
+        // Find the currently active app that's not our app
+        let runningApps = NSWorkspace.shared.runningApplications
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        
+        for app in runningApps {
+            if app.processIdentifier != currentPID && 
+               app.activationPolicy == .regular && 
+               app.isActive && 
+               !app.isTerminated {
+                previousActiveApp = app
+                print("MenuBarManager: Remembered active app: \(app.localizedName ?? "Unknown")")
+                break
+            }
+        }
+        
+        if previousActiveApp == nil {
+            print("MenuBarManager: No active app found to remember")
+        }
+    }
+    
+    private func restorePreviousAppFocus(completion: @escaping () -> Void) {
+        print("MenuBarManager: Attempting to restore focus to previous app")
+        
+        // Hide our menu bar app to lose focus
+        NSApp.hide(nil)
+        
+        // Wait a moment for our app to hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let targetApp = self.previousActiveApp, !targetApp.isTerminated {
+                print("MenuBarManager: Restoring focus to: \(targetApp.localizedName ?? "Unknown")")
+                
+                // Activate the previous app with strong focus
+                let success = targetApp.activate(options: [.activateIgnoringOtherApps])
+                print("MenuBarManager: App activation success: \(success)")
+                
+                // Wait for app activation to complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    print("MenuBarManager: Proceeding with text insertion")
+                    completion()
+                }
+            } else {
+                print("MenuBarManager: No previous app to restore or app terminated")
+                // Still wait a bit for our app to hide
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    completion()
+                }
+            }
+        }
     }
     
     private func updateStatus(_ text: String) {
@@ -168,13 +263,20 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 
                 // Insert into active application
                 print("Calling textInserter.insertText with: '\(text)'")
-                self.textInserter.insertText(text)
                 
-                // Check if accessibility permission is granted for better status message
-                if self.textInserter.hasAccessibilityPermission {
-                    self.updateStatus("Raw text inserted! (Set API key for AI processing)")
-                } else {
-                    self.updateStatus("Text copied to clipboard! Grant accessibility permission to auto-paste")
+                // Ensure we restore focus to the original app before text insertion
+                self.restorePreviousAppFocus {
+                    self.textInserter.insertText(text)
+                }
+                
+                // Small delay to allow TextInserter to complete its work and re-check permissions
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.textInserter.checkAccessibilityPermission()
+                    if self.textInserter.hasAccessibilityPermission {
+                        self.updateStatus("Text inserted automatically! (Set API key for AI processing)")
+                    } else {
+                        self.updateStatus("Text copied to clipboard! Grant accessibility permission for auto-paste")
+                    }
                 }
                 
                 // Reset status after 3 seconds
@@ -197,7 +299,10 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                         pasteboard.setString(processedText, forType: .string)
                         
                         // Insert into active application
-                        self.textInserter.insertText(processedText)
+                        // Ensure we restore focus to the original app before text insertion
+                        self.restorePreviousAppFocus {
+                            self.textInserter.insertText(processedText)
+                        }
                         
                         // Check if accessibility permission is granted for better status message
                         if self.textInserter.hasAccessibilityPermission {
@@ -218,7 +323,10 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                         pasteboard.clearContents()
                         pasteboard.setString(text, forType: .string)
                         
-                        self.textInserter.insertText(text)
+                        // Ensure we restore focus to the original app before text insertion
+                        self.restorePreviousAppFocus {
+                            self.textInserter.insertText(text)
+                        }
                         
                         self.updateStatus("API error - used raw text: \(error.localizedDescription)")
                         
@@ -270,6 +378,7 @@ extension MenuBarManager: SpeechRecognizerDelegate {
 
 extension MenuBarManager: GlobalShortcutDelegate {
     func globalShortcutPressed() {
+        print("MenuBarManager: Global shortcut pressed")
         toggleRecording()
     }
 }

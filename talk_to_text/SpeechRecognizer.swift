@@ -2,6 +2,7 @@ import Foundation
 import Speech
 import AVFoundation
 import os.log
+import AppKit
 
 protocol SpeechRecognizerDelegate: AnyObject {
     func speechRecognizer(_ recognizer: SpeechRecognizer, didStartRecording: Bool)
@@ -24,6 +25,7 @@ class SpeechRecognizer: ObservableObject {
     private var audioEngineRetryCount = 0
     private let maxRetries = 3
     private var lastPartialResult = "" // Store last partial result as fallback
+    private var recordingTimer: DispatchWorkItem? // Timer for auto-stop
     
     init() {
         // Suppress console logs for known framework issues
@@ -119,6 +121,10 @@ class SpeechRecognizer: ObservableObject {
     func stopRecording() {
         guard isRecording else { return }
         
+        // Cancel any existing timer
+        recordingTimer?.cancel()
+        recordingTimer = nil
+        
         // Safely stop audio engine and clean up
         if audioEngine.isRunning {
             audioEngine.stop()
@@ -137,6 +143,10 @@ class SpeechRecognizer: ObservableObject {
         recognitionTask = nil
         
         isRecording = false
+        
+        // Play system sound for recording stop
+        playSystemSound(.recordingStop)
+        
         delegate?.speechRecognizer(self, didStartRecording: false)
     }
     
@@ -218,9 +228,13 @@ class SpeechRecognizer: ObservableObject {
                         
                         if !textToUse.isEmpty {
                             print("Sending recognized text to delegate: '\(textToUse)'")
+                            // Play success sound for successful recognition
+                            self.playSystemSound(.success)
                             self.delegate?.speechRecognizer(self, didRecognizeText: textToUse)
                         } else {
                             print("Recognition completed but no text was recognized (original: '\(recognizedText)', lastPartial: '\(self.lastPartialResult)')")
+                            // Play error sound for failed recognition
+                            self.playSystemSound(.error)
                             self.delegate?.speechRecognizer(self, didFailWithError: SpeechRecognitionError.noTextRecognized)
                         }
                         self.stopRecording()
@@ -242,6 +256,8 @@ class SpeechRecognizer: ObservableObject {
                 }
                 
                 DispatchQueue.main.async {
+                    // Play error sound for speech recognition errors
+                    self.playSystemSound(.error)
                     self.delegate?.speechRecognizer(self, didFailWithError: error)
                     self.stopRecording()
                 }
@@ -292,13 +308,52 @@ class SpeechRecognizer: ObservableObject {
         isRecording = true
         recognizedText = ""
         lastPartialResult = "" // Reset fallback text
+        
+        // Play system sound for recording start
+        playSystemSound(.recordingStart)
+        
         delegate?.speechRecognizer(self, didStartRecording: true)
         
-        // Auto-stop after 30 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+        // Cancel any existing timer and create a new one
+        recordingTimer?.cancel()
+        recordingTimer = DispatchWorkItem { [weak self] in
             if self?.isRecording == true {
                 self?.stopRecording()
             }
+        }
+        
+        // Auto-stop after 30 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: recordingTimer!)
+    }
+    
+    // MARK: - System Sound Support
+    private enum SystemSoundType {
+        case recordingStart
+        case recordingStop
+        case success
+        case error
+    }
+    
+    private func playSystemSound(_ soundType: SystemSoundType) {
+        let soundName: String
+        
+        switch soundType {
+        case .recordingStart:
+            soundName = "Glass" // Clear, pleasant startup sound
+        case .recordingStop:
+            soundName = "Tink" // Short, clean ending sound
+        case .success:
+            soundName = "Purr" // Positive completion sound
+        case .error:
+            soundName = "Sosumi" // Error notification sound
+        }
+        
+        // Play system sound
+        if let sound = NSSound(named: soundName) {
+            sound.play()
+        } else {
+            // Fallback to system beep if named sound not available
+            NSSound.beep()
         }
     }
 }
