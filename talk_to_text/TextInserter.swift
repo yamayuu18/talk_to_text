@@ -13,7 +13,19 @@ class TextInserter: ObservableObject {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
         hasAccessibilityPermission = AXIsProcessTrustedWithOptions(options)
         
+        // より詳細な権限状態をログ出力
         print("Accessibility permission status: \(hasAccessibilityPermission ? "✅ Granted" : "❌ Denied")")
+        print("Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
+        print("App executable path: \(Bundle.main.executablePath ?? "Unknown")")
+        
+        // 権限が無い場合の詳細ガイダンス
+        if !hasAccessibilityPermission {
+            print("⚠️ To grant accessibility permission:")
+            print("   1. Open System Settings → Privacy & Security → Accessibility")
+            print("   2. Find 'Voice to Text' or 'talk_to_text' app")
+            print("   3. Enable the toggle next to the app")
+            print("   4. If app is not listed, click '+' and add it manually")
+        }
     }
     
     
@@ -35,12 +47,34 @@ class TextInserter: ObservableObject {
             return
         }
         
-        // Enhanced delay for better stability
+        // Enhanced delay for better stability and multiple retry attempts
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.sendPasteCommand()
+            self.sendPasteCommandWithRetry(text: text, retryCount: 0)
         }
     }
     
+    private func sendPasteCommandWithRetry(text: String, retryCount: Int) {
+        let maxRetries = 3
+        let success = sendPasteCommand()
+        
+        if !success && retryCount < maxRetries {
+            print("TextInserter: Paste attempt \(retryCount + 1) failed, retrying...")
+            
+            // クリップボードを再設定
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            
+            // 少し待ってからリトライ
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.sendPasteCommandWithRetry(text: text, retryCount: retryCount + 1)
+            }
+        } else if success {
+            print("TextInserter: Paste command sent successfully")
+        } else {
+            print("TextInserter: All paste attempts failed after \(maxRetries) retries")
+        }
+    }
     
     private func sendPasteCommand() -> Bool {
         print("TextInserter: Creating paste command events")

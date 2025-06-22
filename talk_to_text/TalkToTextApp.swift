@@ -7,7 +7,7 @@ struct TalkToTextApp: App {
     var body: some Scene {
         Settings {
             SettingsView()
-                .frame(width: 450, height: 300)
+                .frame(width: 650, height: 500)
         }
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unifiedCompact)

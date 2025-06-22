@@ -20,8 +20,8 @@ class SettingsWindowManager: ObservableObject {
         
         // ウィンドウの設定
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 650, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -31,6 +31,8 @@ class SettingsWindowManager: ObservableObject {
         window.center()
         window.isReleasedWhenClosed = false
         window.level = .floating
+        window.minSize = NSSize(width: 500, height: 400)
+        window.maxSize = NSSize(width: 1000, height: 800)
         
         // デリゲートを強参照で保持
         let delegate = SettingsWindowDelegate { [weak self] in
