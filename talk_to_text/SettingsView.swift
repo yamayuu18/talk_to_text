@@ -2,13 +2,17 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("geminiAPIKey") private var geminiAPIKey: String = ""
+    @AppStorage("openaiAPIKey") private var openaiAPIKey: String = ""
     @AppStorage("shortcutModifiers") private var shortcutModifiers: Int = 0
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode: Int = 0
     
+    @StateObject private var aiServiceManager = AIServiceManager.shared
     @State private var selectedModifiers: Set<ModifierKey> = []
     @State private var selectedKey: String = "Space"
     @State private var isWaitingForKeyPress = false
     @State private var showingAPIKeyAlert = false
+    @State private var apiKeyTestResult: String?
+    @State private var isTestingAPIKey = false
     
     private let availableKeys = [
         "Space", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", 
@@ -18,9 +22,14 @@ struct SettingsView: View {
     
     var body: some View {
         TabView {
-            generalTab
+            aiModelsTab
                 .tabItem {
-                    Label("General", systemImage: "gearshape")
+                    Label("AI Models", systemImage: "brain")
+                }
+            
+            apiKeysTab
+                .tabItem {
+                    Label("API Keys", systemImage: "key")
                 }
             
             shortcutTab
@@ -30,10 +39,78 @@ struct SettingsView: View {
         }
         .onAppear {
             loadStoredShortcut()
+            syncAPIKeysWithManager()
         }
     }
     
-    private var generalTab: some View {
+    private var aiModelsTab: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("AI Provider")
+                    .font(.headline)
+                
+                Picker("AI Provider", selection: $aiServiceManager.selectedProvider) {
+                    ForEach(AIProvider.allCases) { provider in
+                        Text(provider.displayName)
+                            .tag(provider)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                
+                Text("Choose your preferred AI service")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("AI Model")
+                    .font(.headline)
+                
+                Picker("AI Model", selection: $aiServiceManager.selectedModel) {
+                    ForEach(aiServiceManager.availableModels) { model in
+                        HStack {
+                            Text(model.displayName)
+                            if model.isRecommended {
+                                Text("(Recommended)")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                            }
+                        }
+                        .tag(model)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                
+                Text("Select the specific model for text processing")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Status")
+                    .font(.headline)
+                
+                HStack {
+                    Image(systemName: aiServiceManager.isConfigured ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(aiServiceManager.isConfigured ? .green : .orange)
+                    
+                    Text(aiServiceManager.isConfigured ? 
+                         "\(aiServiceManager.currentProviderDisplayName) is configured" : 
+                         "\(aiServiceManager.currentProviderDisplayName) requires API key")
+                        .font(.subheadline)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            Spacer()
+        }
+        .padding()
+    }
+    
+    private var apiKeysTab: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Gemini API Key")
@@ -41,33 +118,67 @@ struct SettingsView: View {
                 
                 SecureField("Enter your Gemini API key", text: $geminiAPIKey)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: geminiAPIKey) { _ in
+                        syncAPIKeysWithManager()
+                    }
                 
                 Text("Get your API key from Google AI Studio")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
+            VStack(alignment: .leading, spacing: 8) {
+                Text("OpenAI API Key")
+                    .font(.headline)
+                
+                SecureField("Enter your OpenAI API key", text: $openaiAPIKey)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: openaiAPIKey) { _ in
+                        syncAPIKeysWithManager()
+                    }
+                
+                Text("Get your API key from OpenAI Platform")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
             HStack {
-                Button("Test API Key") {
-                    testAPIKey()
+                Button(action: {
+                    Task {
+                        await testCurrentAPIKey()
+                    }
+                }) {
+                    if isTestingAPIKey {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Testing...")
+                        }
+                    } else {
+                        Text("Test Current API Key")
+                    }
                 }
-                .disabled(geminiAPIKey.isEmpty)
+                .disabled(!aiServiceManager.isConfigured || isTestingAPIKey)
                 
                 Spacer()
                 
-                Button("Clear") {
+                Button("Clear All") {
                     geminiAPIKey = ""
+                    openaiAPIKey = ""
+                    syncAPIKeysWithManager()
                 }
-                .disabled(geminiAPIKey.isEmpty)
+                .disabled(geminiAPIKey.isEmpty && openaiAPIKey.isEmpty)
             }
             
             Spacer()
         }
         .padding()
-        .alert("API Key Status", isPresented: $showingAPIKeyAlert) {
-            Button("OK") { }
+        .alert("API Key Test Result", isPresented: .constant(apiKeyTestResult != nil)) {
+            Button("OK") { 
+                apiKeyTestResult = nil
+            }
         } message: {
-            Text(geminiAPIKey.isEmpty ? "Please enter an API key" : "API key format looks valid")
+            Text(apiKeyTestResult ?? "")
         }
     }
     
@@ -199,9 +310,42 @@ struct SettingsView: View {
         applyShortcut()
     }
     
-    private func testAPIKey() {
-        showingAPIKeyAlert = true
+    private func testCurrentAPIKey() async {
+        guard aiServiceManager.isConfigured else {
+            apiKeyTestResult = "Please configure an API key for \(aiServiceManager.currentProviderDisplayName) first"
+            return
+        }
+        
+        isTestingAPIKey = true
+        apiKeyTestResult = nil
+        
+        do {
+            let success = try await aiServiceManager.testConnection()
+            if success {
+                apiKeyTestResult = "✅ \(aiServiceManager.currentModelDisplayName) is working perfectly!"
+            } else {
+                apiKeyTestResult = "⚠️ API key seems valid but test response was empty"
+            }
+        } catch {
+            apiKeyTestResult = "❌ \(aiServiceManager.currentProviderDisplayName) test failed: \(error.localizedDescription)"
+        }
+        
+        isTestingAPIKey = false
     }
+    
+    private func syncAPIKeysWithManager() {
+        aiServiceManager.configure(
+            geminiAPIKey: geminiAPIKey.isEmpty ? nil : geminiAPIKey,
+            openaiAPIKey: openaiAPIKey.isEmpty ? nil : openaiAPIKey
+        )
+    }
+    
+    // MARK: - Future Enhancement: Keychain Support
+    // TODO: Add KeychainHelper.swift to Xcode project and implement secure API key storage
+    // The KeychainHelper implementation is available but needs to be properly added to the Xcode project
+    
+    // MARK: - AI Service Integration
+    // This settings view now integrates with the new AIServiceManager for multi-provider support
 }
 
 enum ModifierKey: CaseIterable {

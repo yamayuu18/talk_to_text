@@ -35,8 +35,8 @@ class TextInserter: ObservableObject {
             return
         }
         
-        // Simple delay then paste
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        // Enhanced delay for better stability
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.sendPasteCommand()
         }
     }
@@ -64,15 +64,15 @@ class TextInserter: ObservableObject {
         
         print("TextInserter: Sending single Cmd+V command")
         
-        // Send the key events with proper timing - ONLY ONCE
+        // Send the key events with improved timing for better stability
         keyDownEvent.post(tap: .cgSessionEventTap)
-        usleep(50000) // 50ms delay between key down and up
+        usleep(100000) // 100ms delay between key down and up (increased from 50ms)
         keyUpEvent.post(tap: .cgSessionEventTap)
         
         print("TextInserter: Cmd+V sent successfully")
         
-        // Give the paste operation time to complete
-        usleep(100000) // 100ms delay
+        // Give the paste operation more time to complete for better reliability
+        usleep(150000) // 150ms delay (increased from 100ms)
         
         return true
     }

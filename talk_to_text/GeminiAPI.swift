@@ -3,7 +3,7 @@ import Foundation
 class GeminiAPI {
     static let shared = GeminiAPI()
     
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
     private let session = URLSession.shared
     
     private init() {}
@@ -65,10 +65,10 @@ class GeminiAPI {
                 ]
             ],
             "generationConfig": [
-                "temperature": 0.3,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": 2048
+                "temperature": 0.2,
+                "topK": 32,
+                "topP": 0.9,
+                "maxOutputTokens": 4096
             ]
         ]
         
@@ -87,13 +87,17 @@ class GeminiAPI {
 
         校正の際は以下の点に注意してください：
         1. 誤字脱字の修正
-        2. 自然な文章構造への調整
-        3. 適切な句読点の挿入
-        4. 敬語や丁寧語の統一
-        5. 話し言葉から書き言葉への変換（必要に応じて）
+        2. "えーと"、"あのー"、"まあ"のようなフィラーワードの除去
+        3. 話し言葉から書き言葉への自然な変換
+        4. 適切な句読点の挿入
+        5. 文章構造の整理と自然な流れの確保
+        6. 敬語や丁寧語の統一
+        7. 重複表現の削除
 
-        元のテキストの意味や内容は一切変更せず、文章の品質向上のみを行ってください。
-        校正結果のみを出力し、説明や前置きは不要です。
+        重要な制約：
+        - 元のテキストの意味や意図は決して変更しないでください
+        - 校正後のテキストのみを出力してください（説明や前置きは不要）
+        - 空の入力の場合は何も出力しないでください
 
         音声認識テキスト：
         \(text)
@@ -125,11 +129,13 @@ class GeminiAPI {
     }
     
     func testAPIKey() async throws -> Bool {
-        let testText = "これはテストです。"
+        let testText = "これは、えーと、テストです。"
         
         do {
             let result = try await processText(testText)
-            return !result.isEmpty
+            // Verify that the response is not only non-empty but also processed correctly
+            let trimmedResult = result.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmedResult.isEmpty && trimmedResult != testText
         } catch {
             throw error
         }
@@ -189,5 +195,23 @@ extension GeminiAPI {
         let currentRequests = defaults.integer(forKey: "gemini_total_requests")
         defaults.set(currentRequests + 1, forKey: "gemini_total_requests")
         defaults.set(Date(), forKey: "gemini_last_used")
+    }
+    
+    // MARK: - Enhanced API Processing
+    
+    func processTextWithFallback(_ text: String) async -> (result: String, isProcessed: Bool) {
+        guard !apiKey.isEmpty else {
+            return (text, false)
+        }
+        
+        do {
+            let processedText = try await processText(text)
+            updateUsageStatistics()
+            return (processedText, true)
+        } catch {
+            print("Gemini API processing failed: \(error.localizedDescription)")
+            // Return original text as fallback
+            return (text, false)
+        }
     }
 }

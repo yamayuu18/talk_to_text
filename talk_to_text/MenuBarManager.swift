@@ -6,7 +6,6 @@ class MenuBarManager: ObservableObject {
     private var speechRecognizer: SpeechRecognizer!
     private var globalShortcut: GlobalShortcut!
     private var textInserter: TextInserter!
-    private var settingsWindowController: NSWindowController?
     
     // Track the app that was active before speech recognition
     private var previousActiveApp: NSRunningApplication?
@@ -88,40 +87,13 @@ class MenuBarManager: ObservableObject {
     }
     
     @objc private func openSettings() {
-        // Create or show settings window using NSWindowController
-        DispatchQueue.main.async { [weak self] in
-            if let settingsWindowController = self?.settingsWindowController {
-                // Window already exists, just bring it to front
-                settingsWindowController.window?.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            } else {
-                // Create new settings window
-                let settingsView = SettingsView()
-                let hostingController = NSHostingController(rootView: settingsView)
-                
-                let window = NSWindow(
-                    contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
-                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                    backing: .buffered,
-                    defer: false
-                )
-                
-                window.title = "Settings"
-                window.contentViewController = hostingController
-                window.isReleasedWhenClosed = false
-                window.level = .normal
-                window.minSize = NSSize(width: 500, height: 400)
-                window.maxSize = NSSize(width: 900, height: 700)
-                window.setFrame(NSRect(x: 0, y: 0, width: 600, height: 500), display: false)
-                window.center()
-                
-                let windowController = NSWindowController(window: window)
-                self?.settingsWindowController = windowController
-                
-                windowController.showWindow(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            }
+        // Use SwiftUI Settings Scene for cleaner implementation
+        if #available(macOS 14.0, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else if #available(macOS 13.0, *) {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc private func handleAccessibilitySetup() {
@@ -237,11 +209,17 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     func speechRecognizer(_ recognizer: SpeechRecognizer, didStartRecording: Bool) {
         DispatchQueue.main.async {
             self.isRecording = didStartRecording
-            self.updateStatus(didStartRecording ? "Recording..." : "Ready")
             
-            if let button = self.statusBarItem.button {
-                button.image = NSImage(systemSymbolName: didStartRecording ? "mic.fill" : "mic", 
-                                     accessibilityDescription: "Voice to Text")
+            if didStartRecording {
+                self.updateStatus("🔴 Listening... Speak now (30s max)")
+                if let button = self.statusBarItem.button {
+                    button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Recording...")
+                }
+            } else {
+                self.updateStatus("📝 Processing speech...")
+                if let button = self.statusBarItem.button {
+                    button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "Voice to Text")
+                }
             }
         }
     }
@@ -249,10 +227,10 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     func speechRecognizer(_ recognizer: SpeechRecognizer, didRecognizeText text: String) {
         print("MenuBarManager received text: '\(text)' (length: \(text.count))")
         
-        // Check if API key is configured
-        let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+        // Check if any AI service is configured
+        let aiManager = AIServiceManager.shared
         
-        if apiKey.isEmpty {
+        if !aiManager.isConfigured {
             // No API key - use raw speech recognition text
             DispatchQueue.main.async {
                 // Copy to clipboard
@@ -273,7 +251,7 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     self.textInserter.checkAccessibilityPermission()
                     if self.textInserter.hasAccessibilityPermission {
-                        self.updateStatus("Text inserted automatically! (Set API key for AI processing)")
+                        self.updateStatus("Text inserted automatically! (Configure AI service for processing)")
                     } else {
                         self.updateStatus("Text copied to clipboard! Grant accessibility permission for auto-paste")
                     }
@@ -285,54 +263,42 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 }
             }
         } else {
-            // API key available - process with Gemini
-            updateStatus("Processing with AI...")
+            // AI service available - process with selected AI model
+            updateStatus("Processing with \(aiManager.currentProviderDisplayName)...")
             
             Task {
-                do {
-                    let processedText = try await GeminiAPI.shared.processText(text)
+                let result = await aiManager.processTextWithFallback(text)
                     
-                    DispatchQueue.main.async {
-                        // Copy to clipboard
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(processedText, forType: .string)
-                        
-                        // Insert into active application
-                        // Ensure we restore focus to the original app before text insertion
-                        self.restorePreviousAppFocus {
-                            self.textInserter.insertText(processedText)
-                        }
-                        
-                        // Check if accessibility permission is granted for better status message
-                        if self.textInserter.hasAccessibilityPermission {
-                            self.updateStatus("AI-processed text inserted!")
+                DispatchQueue.main.async {
+                    // Copy to clipboard
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(result.result, forType: .string)
+                    
+                    // Insert into active application
+                    // Ensure we restore focus to the original app before text insertion
+                    self.restorePreviousAppFocus {
+                        self.textInserter.insertText(result.result)
+                    }
+                    
+                    // Check if accessibility permission is granted for better status message
+                    if self.textInserter.hasAccessibilityPermission {
+                        if result.isProcessed {
+                            self.updateStatus("\(aiManager.currentModelDisplayName) processed text inserted!")
                         } else {
-                            self.updateStatus("AI text copied to clipboard! Grant accessibility permission to auto-paste")
+                            self.updateStatus("AI unavailable - raw text inserted!")
                         }
-                        
-                        // Reset status after 2 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            self.updateStatus("Ready")
+                    } else {
+                        if result.isProcessed {
+                            self.updateStatus("AI text copied to clipboard! Grant accessibility permission to auto-paste")
+                        } else {
+                            self.updateStatus("Text copied to clipboard! Grant accessibility permission to auto-paste")
                         }
                     }
-                } catch {
-                    // Fallback to raw text if API processing fails
-                    DispatchQueue.main.async {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(text, forType: .string)
                         
-                        // Ensure we restore focus to the original app before text insertion
-                        self.restorePreviousAppFocus {
-                            self.textInserter.insertText(text)
-                        }
-                        
-                        self.updateStatus("API error - used raw text: \(error.localizedDescription)")
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                            self.updateStatus("Ready")
-                        }
+                    // Reset status after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        self.updateStatus("Ready")
                     }
                 }
             }
@@ -343,33 +309,49 @@ extension MenuBarManager: SpeechRecognizerDelegate {
         DispatchQueue.main.async {
             self.isRecording = false
             
-            // Provide specific error messages based on error type
-            var errorMessage = "Error: \(error.localizedDescription)"
+            // Provide specific error messages with clear actions
+            var errorMessage = "❌ Error: \(error.localizedDescription)"
+            var actionMessage = ""
             
             if let speechError = error as? SpeechRecognitionError {
                 switch speechError {
                 case .microphonePermissionDenied:
-                    errorMessage = "Microphone access denied. Please grant permission in System Settings."
+                    errorMessage = "🎤 Microphone access required"
+                    actionMessage = "Grant in System Settings > Privacy & Security > Microphone"
                 case .permissionDenied:
-                    errorMessage = "Speech recognition permission denied. Please enable in System Settings."
+                    errorMessage = "🗣️ Speech recognition permission required"
+                    actionMessage = "Enable in System Settings > Privacy & Security > Speech Recognition"
+                case .permissionNotDetermined:
+                    errorMessage = "🔍 Permission not set"
+                    actionMessage = "Restart app and grant permission when prompted"
                 case .speechRecognizerUnavailable:
-                    errorMessage = "Speech recognition unavailable. Please enable Dictation in System Settings."
+                    errorMessage = "📝 Speech recognition unavailable"
+                    actionMessage = "Enable Dictation in System Settings > Keyboard > Dictation"
                 case .audioEngineError:
-                    errorMessage = "Audio engine failed. Please try again or check microphone settings."
+                    errorMessage = "🔧 Audio system error"
+                    actionMessage = "Try again or restart app if problem persists"
                 case .noTextRecognized:
-                    errorMessage = "No speech detected. Please speak clearly and try again."
+                    errorMessage = "🔇 No speech detected"
+                    actionMessage = "Speak clearly and try again"
+                case .recordingTimeout:
+                    errorMessage = "⏱️ Recording timed out"
+                    actionMessage = "Automatically stopped after 30 seconds"
                 default:
-                    errorMessage = "Speech recognition error: \(speechError.localizedDescription)"
+                    errorMessage = "⚠️ Recognition error: \(speechError.localizedDescription)"
                 }
             }
             
-            self.updateStatus(errorMessage)
+            // Combine error and action messages
+            let fullMessage = actionMessage.isEmpty ? errorMessage : "\(errorMessage) - \(actionMessage)"
+            self.updateStatus(fullMessage)
             
+            // Reset button icon
             if let button = self.statusBarItem.button {
                 button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "Voice to Text")
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            // Auto-clear error message after 6 seconds for better readability
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                 self.updateStatus("Ready")
             }
         }

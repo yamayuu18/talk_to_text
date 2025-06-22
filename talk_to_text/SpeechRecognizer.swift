@@ -61,29 +61,91 @@ class SpeechRecognizer: ObservableObject {
             return
         }
         
-        SFSpeechRecognizer.requestAuthorization { [weak self] authStatus in
+        // Check current authorization status first
+        let currentStatus = SFSpeechRecognizer.authorizationStatus()
+        
+        switch currentStatus {
+        case .authorized:
             DispatchQueue.main.async {
-                switch authStatus {
-                case .authorized:
-                    self?.hasPermission = true
-                    self?.requestMicrophonePermission()
-                case .denied, .restricted, .notDetermined:
-                    self?.hasPermission = false
-                    self?.delegate?.speechRecognizer(
-                        self!,
-                        didFailWithError: SpeechRecognitionError.permissionDenied
-                    )
-                @unknown default:
-                    self?.hasPermission = false
+                self.hasPermission = true
+                self.requestMicrophonePermission()
+            }
+        case .notDetermined:
+            SFSpeechRecognizer.requestAuthorization { [weak self] authStatus in
+                DispatchQueue.main.async {
+                    switch authStatus {
+                    case .authorized:
+                        self?.hasPermission = true
+                        self?.requestMicrophonePermission()
+                    case .denied, .restricted:
+                        self?.hasPermission = false
+                        self?.delegate?.speechRecognizer(
+                            self!,
+                            didFailWithError: SpeechRecognitionError.permissionDenied
+                        )
+                    case .notDetermined:
+                        self?.hasPermission = false
+                        self?.delegate?.speechRecognizer(
+                            self!,
+                            didFailWithError: SpeechRecognitionError.permissionNotDetermined
+                        )
+                    @unknown default:
+                        self?.hasPermission = false
+                        self?.delegate?.speechRecognizer(
+                            self!,
+                            didFailWithError: SpeechRecognitionError.permissionDenied
+                        )
+                    }
                 }
+            }
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                self.hasPermission = false
+                self.delegate?.speechRecognizer(
+                    self,
+                    didFailWithError: SpeechRecognitionError.permissionDenied
+                )
+            }
+        @unknown default:
+            DispatchQueue.main.async {
+                self.hasPermission = false
+                self.delegate?.speechRecognizer(
+                    self,
+                    didFailWithError: SpeechRecognitionError.permissionDenied
+                )
             }
         }
     }
     
     private func requestMicrophonePermission() {
-        // On macOS, microphone permission is handled through system preferences
-        // We'll check if audio input is available when we try to start recording
-        print("Microphone permission will be checked during audio engine startup")
+        #if os(macOS)
+        // On macOS, microphone permission is checked during audio engine startup
+        // We verify access when configuring the audio input node
+        checkMicrophoneAccess()
+        #else
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if !granted {
+                    self?.delegate?.speechRecognizer(
+                        self!,
+                        didFailWithError: SpeechRecognitionError.microphonePermissionDenied
+                    )
+                }
+            }
+        }
+        #endif
+    }
+    
+    private func checkMicrophoneAccess() {
+        // Test microphone access by checking input node configuration
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        
+        if format.sampleRate == 0 {
+            print("Warning: Microphone access may be restricted")
+        } else {
+            print("Microphone access verified (sample rate: \(format.sampleRate))")
+        }
     }
     
     func startRecording() {
@@ -169,6 +231,9 @@ class SpeechRecognizer: ObservableObject {
         
         // Reset audio engine to clear any problematic state
         audioEngine.reset()
+        
+        // Additional safety delay after reset to ensure stability
+        usleep(200000) // 200ms delay
         
         // Check if input node is available (microphone permission)
         guard inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
@@ -322,8 +387,10 @@ class SpeechRecognizer: ObservableObject {
             }
         }
         
-        // Auto-stop after 30 seconds
+        // Auto-stop after 30 seconds with proper cleanup
         DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: recordingTimer!)
+        
+        print("Speech recognition started successfully with 30-second auto-stop timer")
     }
     
     // MARK: - System Sound Support
@@ -360,17 +427,21 @@ class SpeechRecognizer: ObservableObject {
 
 enum SpeechRecognitionError: LocalizedError {
     case permissionDenied
+    case permissionNotDetermined
     case microphonePermissionDenied
     case recognitionRequestFailed
     case speechRecognizerUnavailable
     case dictationNotConfigured
     case audioEngineError
     case noTextRecognized
+    case recordingTimeout
     
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
             return "Speech recognition permission denied. Please enable it in System Settings > Privacy & Security > Speech Recognition."
+        case .permissionNotDetermined:
+            return "Speech recognition permission not yet requested. Please restart the app and grant permission when prompted."
         case .microphonePermissionDenied:
             return "Microphone permission denied. Please enable it in System Settings > Privacy & Security > Microphone."
         case .recognitionRequestFailed:
@@ -383,6 +454,8 @@ enum SpeechRecognitionError: LocalizedError {
             return "Audio engine failed to start. Please try again or restart the application."
         case .noTextRecognized:
             return "No speech was detected. Please speak clearly and try again."
+        case .recordingTimeout:
+            return "Recording timed out after 30 seconds. Recording stopped automatically."
         }
     }
 }
