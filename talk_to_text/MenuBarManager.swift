@@ -6,6 +6,7 @@ class MenuBarManager: ObservableObject {
     private var speechRecognizer: SpeechRecognizer!
     private var globalShortcut: GlobalShortcut!
     private var textInserter: TextInserter!
+    private var settingsWindowManager: SettingsWindowManager!
     
     // Track the app that was active before speech recognition
     private var previousActiveApp: NSRunningApplication?
@@ -63,6 +64,7 @@ class MenuBarManager: ObservableObject {
         speechRecognizer = SpeechRecognizer()
         globalShortcut = GlobalShortcut()
         textInserter = TextInserter()
+        settingsWindowManager = SettingsWindowManager()
         
         speechRecognizer.delegate = self
         globalShortcut.delegate = self
@@ -87,13 +89,7 @@ class MenuBarManager: ObservableObject {
     }
     
     @objc private func openSettings() {
-        // Use SwiftUI Settings Scene for cleaner implementation
-        if #available(macOS 14.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else if #available(macOS 13.0, *) {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-        }
-        NSApp.activate(ignoringOtherApps: true)
+        settingsWindowManager.showSettings()
     }
     
     @objc private func handleAccessibilitySetup() {

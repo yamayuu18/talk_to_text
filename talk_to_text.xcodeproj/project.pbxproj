@@ -21,6 +21,7 @@
 		A100000100000000000000034 /* GeminiAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000035 /* GeminiAPIService.swift */; };
 		A100000100000000000000036 /* OpenAIAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000037 /* OpenAIAPIService.swift */; };
 		A100000100000000000000038 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000039 /* KeychainHelper.swift */; };
+		A100000100000000000000040 /* SettingsWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000041 /* SettingsWindowManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A100000100000000000000035 /* GeminiAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAPIService.swift; sourceTree = "<group>"; };
 		A100000100000000000000037 /* OpenAIAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIAPIService.swift; sourceTree = "<group>"; };
 		A100000100000000000000039 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		A100000100000000000000041 /* SettingsWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +69,7 @@
 				A100000100000000000000035 /* GeminiAPIService.swift */,
 				A100000100000000000000037 /* OpenAIAPIService.swift */,
 				A100000100000000000000039 /* KeychainHelper.swift */,
+				A100000100000000000000041 /* SettingsWindowManager.swift */,
 				A100000100000000000000021 /* GlobalShortcut.swift */,
 				A100000100000000000000023 /* TextInserter.swift */,
 				A100000100000000000000025 /* Assets.xcassets */,
@@ -163,6 +166,7 @@
 				A100000100000000000000034 /* GeminiAPIService.swift in Sources */,
 				A100000100000000000000036 /* OpenAIAPIService.swift in Sources */,
 				A100000100000000000000038 /* KeychainHelper.swift in Sources */,
+				A100000100000000000000040 /* SettingsWindowManager.swift in Sources */,
 				A100000100000000000000020 /* GlobalShortcut.swift in Sources */,
 				A100000100000000000000022 /* TextInserter.swift in Sources */,
 			);

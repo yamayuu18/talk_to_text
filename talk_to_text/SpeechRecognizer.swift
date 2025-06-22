@@ -180,6 +180,8 @@ class SpeechRecognizer: ObservableObject {
         }
     }
     
+    private var hasPlayedStopSound = false
+    
     func stopRecording() {
         guard isRecording else { return }
         
@@ -206,8 +208,11 @@ class SpeechRecognizer: ObservableObject {
         
         isRecording = false
         
-        // Play system sound for recording stop
-        playSystemSound(.recordingStop)
+        // Play stop sound only once per recording session
+        if !hasPlayedStopSound {
+            playSystemSound(.recordingStop)
+            hasPlayedStopSound = true
+        }
         
         delegate?.speechRecognizer(self, didStartRecording: false)
     }
@@ -293,16 +298,17 @@ class SpeechRecognizer: ObservableObject {
                         
                         if !textToUse.isEmpty {
                             print("Sending recognized text to delegate: '\(textToUse)'")
-                            // Play success sound for successful recognition
-                            self.playSystemSound(.success)
+                            // Play success sound and stop recording
+                            self.playSuccessSound()
+                            self.stopRecording()
                             self.delegate?.speechRecognizer(self, didRecognizeText: textToUse)
                         } else {
                             print("Recognition completed but no text was recognized (original: '\(recognizedText)', lastPartial: '\(self.lastPartialResult)')")
-                            // Play error sound for failed recognition
-                            self.playSystemSound(.error)
+                            // Play error sound and stop recording
+                            self.playErrorSound()
+                            self.stopRecording()
                             self.delegate?.speechRecognizer(self, didFailWithError: SpeechRecognitionError.noTextRecognized)
                         }
-                        self.stopRecording()
                     }
                 } else if !recognizedText.isEmpty {
                     // Store partial result as fallback
@@ -321,10 +327,10 @@ class SpeechRecognizer: ObservableObject {
                 }
                 
                 DispatchQueue.main.async {
-                    // Play error sound for speech recognition errors
-                    self.playSystemSound(.error)
-                    self.delegate?.speechRecognizer(self, didFailWithError: error)
+                    // Play error sound and stop recording
+                    self.playErrorSound()
                     self.stopRecording()
+                    self.delegate?.speechRecognizer(self, didFailWithError: error)
                 }
             }
         }
@@ -373,6 +379,7 @@ class SpeechRecognizer: ObservableObject {
         isRecording = true
         recognizedText = ""
         lastPartialResult = "" // Reset fallback text
+        hasPlayedStopSound = false // Reset stop sound flag for new recording session
         
         // Play system sound for recording start
         playSystemSound(.recordingStart)
@@ -421,6 +428,22 @@ class SpeechRecognizer: ObservableObject {
         } else {
             // Fallback to system beep if named sound not available
             NSSound.beep()
+        }
+    }
+    
+    // 成功時の音を再生（停止音をスキップ）
+    private func playSuccessSound() {
+        if !hasPlayedStopSound {
+            playSystemSound(.success)
+            hasPlayedStopSound = true // 停止音の再生を防ぐ
+        }
+    }
+    
+    // エラー時の音を再生（停止音をスキップ）
+    private func playErrorSound() {
+        if !hasPlayedStopSound {
+            playSystemSound(.error)
+            hasPlayedStopSound = true // 停止音の再生を防ぐ
         }
     }
 }
