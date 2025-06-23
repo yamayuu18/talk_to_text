@@ -7,6 +7,7 @@ class MenuBarManager: ObservableObject {
     private var globalShortcut: GlobalShortcut!
     private var textInserter: TextInserter!
     private var settingsWindowManager: SettingsWindowManager!
+    private var audioFeedbackManager: AudioFeedbackManager!
     
     // Track the app that was active before speech recognition
     private var previousActiveApp: NSRunningApplication?
@@ -65,6 +66,7 @@ class MenuBarManager: ObservableObject {
         globalShortcut = GlobalShortcut()
         textInserter = TextInserter()
         settingsWindowManager = SettingsWindowManager()
+        audioFeedbackManager = AudioFeedbackManager.shared
         
         speechRecognizer.delegate = self
         globalShortcut.delegate = self
@@ -81,10 +83,17 @@ class MenuBarManager: ObservableObject {
     private func startRecording() {
         // Remember the currently active app before starting recording
         rememberCurrentActiveApp()
+        
+        // Play recording start sound
+        audioFeedbackManager.playFeedback(.recordStart)
+        
         speechRecognizer.startRecording()
     }
     
     private func stopRecording() {
+        // Play recording stop sound
+        audioFeedbackManager.playFeedback(.recordStop)
+        
         speechRecognizer.stopRecording()
     }
     
@@ -213,6 +222,8 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 }
             } else {
                 self.updateStatus("📝 Processing speech...")
+                // Play processing sound when speech recognition ends
+                self.audioFeedbackManager.playFeedback(.processing)
                 if let button = self.statusBarItem.button {
                     button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "Voice to Text")
                 }
@@ -243,6 +254,9 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                     self.textInserter.insertText(text)
                 }
                 
+                // Play success sound for raw text processing
+                self.audioFeedbackManager.playFeedback(.success)
+                
                 // Small delay to allow TextInserter to complete its work and re-check permissions
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     self.textInserter.checkAccessibilityPermission()
@@ -271,6 +285,8 @@ extension MenuBarManager: SpeechRecognizerDelegate {
 
                 guard !finalText.isEmpty else {
                     DispatchQueue.main.async {
+                        // Play error sound for empty AI result
+                        self.audioFeedbackManager.playFeedback(.error)
                         self.updateStatus("❌ AI processing resulted in empty text. Original speech kept in clipboard.")
                         // 元の音声認識テキストをクリップボードに保存
                         let pasteboard = NSPasteboard.general
@@ -287,6 +303,9 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 }
                     
                 DispatchQueue.main.async {
+                    // Play success sound for successful text processing
+                    self.audioFeedbackManager.playFeedback(.success)
+                    
                     // Copy to clipboard
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
@@ -326,6 +345,9 @@ extension MenuBarManager: SpeechRecognizerDelegate {
     func speechRecognizer(_ recognizer: SpeechRecognizer, didFailWithError error: Error) {
         DispatchQueue.main.async {
             self.isRecording = false
+            
+            // Play error sound for speech recognition failure
+            self.audioFeedbackManager.playFeedback(.error)
             
             // Provide specific error messages with clear actions
             var errorMessage = "❌ Error: \(error.localizedDescription)"

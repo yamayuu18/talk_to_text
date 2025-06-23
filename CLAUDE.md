@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Clean Build**: `xcodebuild -project talk_to_text.xcodeproj -scheme talk_to_text clean`
 - **Clear DerivedData**: `rm -rf ~/Library/Developer/Xcode/DerivedData/talk_to_text-*`
 - **Launch Built App**: `open ~/Library/Developer/Xcode/DerivedData/talk_to_text-*/Build/Products/Debug/talk_to_text.app`
+- **Development Install**: `./install_dev.sh` (builds and installs to fixed path for accessibility permission persistence)
 
 ### Build Troubleshooting
 - **File Reference Errors**: Clean DerivedData cache if Xcode references old file names
@@ -68,11 +69,19 @@ This is a native macOS menu bar application for speech-to-text conversion with A
 - Multiple insertion methods: CGEvent simulation + AppleScript fallback
 - Implements clipboard integration as backup method
 
+**AudioFeedbackManager.swift** - Custom audio feedback system
+- Programmatic WAV audio generation for distinct user feedback
+- Five feedback types: recordStart, recordStop, processing, success, error
+- User-configurable volume and enable/disable settings
+- Fallback to system sounds if custom audio generation fails
+- Integrated throughout MenuBarManager workflow for state feedback
+
 **SettingsView.swift** - SwiftUI settings interface
-- Form-based three-tab interface: AI Models, API Keys, and Shortcuts
+- Form-based four-tab interface: AI Models, API Keys, Shortcuts, and Audio
 - Real-time AI provider and model selection
 - Multi-provider API key management with individual testing
 - Real-time shortcut customization with immediate application
+- Audio feedback controls with sound preview buttons
 
 **SettingsWindowManager.swift** - Dedicated settings window manager for menu bar apps
 - Creates resizable NSWindow (650x500 default, 500x400-1000x800 range)
@@ -149,16 +158,20 @@ Each major component defines custom error enums (e.g., AIServiceError, SpeechRec
 - `"selectedAIModel"`: Current AI model selection
 - `"shortcutModifiers"`: Global shortcut modifier keys (as integer bitmask)
 - `"shortcutKeyCode"`: Global shortcut key code
+- `"audioFeedbackEnabled"`: Boolean for audio feedback system
+- `"audioFeedbackVolume"`: Float (0.0-1.0) for feedback volume
 
 ### Testing the Application
 - **Manual Testing**: Build and run through Xcode, trigger shortcut (⌘+⇧+Space) to test recording workflow
 - **AI API Testing**: Use Settings panel "Test Current API Key" button to validate selected AI service
 - **Provider Switching**: Test switching between Gemini and OpenAI providers in Settings
+- **Audio Feedback Testing**: Use Settings → Audio tab → sound preview buttons to test each feedback type
 - **Permission Testing**: Check System Settings → Privacy & Security for required permissions
 - **Debug Console**: Monitor Console.app or Xcode debug area for detailed operational logs
   - `MenuBarManager:` logs show AI processing and clipboard states
   - `GlobalShortcut:` logs show shortcut registration/updates
   - `TextInserter:` logs show accessibility permission and paste attempts
+  - `AudioFeedbackManager:` logs show audio playback and fallback behavior
 
 ### Known Warnings & Issues
 - **Carbon API Deprecation**: `UTGetOSTypeFromString` warnings in GlobalShortcut.swift are expected - functionality still works on macOS 15+
@@ -178,8 +191,13 @@ This approach avoids SwiftUI Settings scene warnings and provides better control
 ### File Naming Consistency
 All files use `talk_to_text` naming (not `VoiceToText`). When creating new files, follow this pattern:
 - Project: `talk_to_text.xcodeproj`
-- Bundle ID: `com.voicetotext.app.v2` (updated to resolve accessibility permission issues)
+- Bundle ID: `com.voicetotext.talktotext` (stable identifier for accessibility permission persistence)
 - Display name: "Talk to Text"
+
+### Accessibility Permission Persistence
+**Critical Issue**: Debug builds use temporary paths that reset accessibility permissions on each build.
+**Solution**: Use release builds or install to fixed path via `./install_dev.sh` for persistent permissions.
+The install script builds and deploys to `/Applications/TalkToText-Dev/` for consistent accessibility setup.
 
 ## AI Service Architecture
 
@@ -233,3 +251,28 @@ Each AI service uses Japanese-optimized prompts for text correction:
 - All user-facing messages must be in Japanese
 - All code comments should be in Japanese when working on this project
 - Always maintain Japanese language context in all development work
+
+## Audio Feedback System Architecture
+
+### AudioFeedbackManager Design
+The audio feedback system uses programmatic sound generation instead of audio files:
+
+**Sound Generation**:
+- **WAV Format**: Generates PCM audio data with proper WAV headers for AVAudioPlayer compatibility
+- **Custom Waveforms**: Uses sine waves with envelopes and frequency modulation
+- **Feedback Types**:
+  - `recordStart`: 800Hz, 0.1s duration - Brief notification sound
+  - `recordStop`: 600Hz→400Hz dual tone, 0.15s - Clear end indication
+  - `processing`: 440Hz, 0.2s - Soft processing indicator
+  - `success`: C-E-G chord progression, 0.4s - Pleasant completion sound
+  - `error`: 400→300→200Hz descending, 0.3s - Distinct error indication
+
+**Integration Points**:
+- MenuBarManager calls appropriate feedback at each workflow stage
+- Fallback to system sounds (AudioServicesPlaySystemSound) if custom generation fails
+- User controls via Settings → Audio tab with real-time preview capability
+
+### Audio Implementation Notes
+- **macOS Compatibility**: Uses AVFoundation (not AVAudioSession which is iOS-only)
+- **Performance**: Sounds are pre-generated on initialization for immediate playback
+- **User Experience**: Volume control and enable/disable toggle for accessibility preferences

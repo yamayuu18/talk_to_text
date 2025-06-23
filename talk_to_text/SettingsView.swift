@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode: Int = 0
     
     @StateObject private var aiServiceManager = AIServiceManager.shared
+    @StateObject private var audioFeedbackManager = AudioFeedbackManager.shared
     @State private var selectedModifiers: Set<ModifierKey> = []
     @State private var selectedKey: String = "Space"
     @State private var isWaitingForKeyPress = false
@@ -35,6 +36,11 @@ struct SettingsView: View {
             shortcutTab
                 .tabItem {
                     Label("Shortcuts", systemImage: "keyboard")
+                }
+            
+            audioFeedbackTab
+                .tabItem {
+                    Label("Audio", systemImage: "speaker.2")
                 }
         }
         .onAppear {
@@ -247,6 +253,76 @@ struct SettingsView: View {
         ))
         .onChange(of: selectedModifiers) { _ in updateStoredShortcut() }
         .onChange(of: selectedKey) { _ in updateStoredShortcut() }
+    }
+    
+    private var audioFeedbackTab: some View {
+        Form {
+            Section(header: Text("Audio Feedback Settings").font(.headline)) {
+                HStack {
+                    Toggle("Enable Audio Feedback", isOn: $audioFeedbackManager.isSoundEnabled)
+                    Spacer()
+                }
+                .help("Play sounds for different app states (start, stop, success, error)")
+                
+                if audioFeedbackManager.isSoundEnabled {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Volume")
+                            .font(.subheadline)
+                        
+                        HStack {
+                            Image(systemName: "speaker.1")
+                                .foregroundColor(.secondary)
+                            Slider(value: $audioFeedbackManager.feedbackVolume, in: 0.0...1.0, step: 0.1)
+                            Image(systemName: "speaker.3")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Volume: \(Int(audioFeedbackManager.feedbackVolume * 100))%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 20)
+                }
+            }
+            
+            Section(header: Text("Sound Preview").font(.headline)) {
+                VStack(spacing: 8) {
+                    Button("🔴 Recording Start Sound") {
+                        audioFeedbackManager.playFeedback(.recordStart)
+                    }
+                    .disabled(!audioFeedbackManager.isSoundEnabled)
+                    
+                    Button("⏹️ Recording Stop Sound") {
+                        audioFeedbackManager.playFeedback(.recordStop)
+                    }
+                    .disabled(!audioFeedbackManager.isSoundEnabled)
+                    
+                    Button("⚙️ Processing Sound") {
+                        audioFeedbackManager.playFeedback(.processing)
+                    }
+                    .disabled(!audioFeedbackManager.isSoundEnabled)
+                    
+                    Button("✅ Success Sound") {
+                        audioFeedbackManager.playFeedback(.success)
+                    }
+                    .disabled(!audioFeedbackManager.isSoundEnabled)
+                    
+                    Button("❌ Error Sound") {
+                        audioFeedbackManager.playFeedback(.error)
+                    }
+                    .disabled(!audioFeedbackManager.isSoundEnabled)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            Section {
+                Button("Reset to Defaults") {
+                    audioFeedbackManager.resetToDefaults()
+                }
+                .foregroundColor(.orange)
+            }
+        }
+        .padding()
     }
     
     private var currentShortcutString: String {

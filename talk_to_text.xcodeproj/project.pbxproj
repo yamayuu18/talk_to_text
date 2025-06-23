@@ -22,6 +22,7 @@
 		A100000100000000000000036 /* OpenAIAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000037 /* OpenAIAPIService.swift */; };
 		A100000100000000000000038 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000039 /* KeychainHelper.swift */; };
 		A100000100000000000000040 /* SettingsWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000041 /* SettingsWindowManager.swift */; };
+		A100000100000000000000042 /* AudioFeedbackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000100000000000000043 /* AudioFeedbackManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		A100000100000000000000037 /* OpenAIAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIAPIService.swift; sourceTree = "<group>"; };
 		A100000100000000000000039 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		A100000100000000000000041 /* SettingsWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowManager.swift; sourceTree = "<group>"; };
+		A100000100000000000000043 /* AudioFeedbackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFeedbackManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +72,7 @@
 				A100000100000000000000037 /* OpenAIAPIService.swift */,
 				A100000100000000000000039 /* KeychainHelper.swift */,
 				A100000100000000000000041 /* SettingsWindowManager.swift */,
+				A100000100000000000000043 /* AudioFeedbackManager.swift */,
 				A100000100000000000000021 /* GlobalShortcut.swift */,
 				A100000100000000000000023 /* TextInserter.swift */,
 				A100000100000000000000025 /* Assets.xcassets */,
@@ -167,6 +170,7 @@
 				A100000100000000000000036 /* OpenAIAPIService.swift in Sources */,
 				A100000100000000000000038 /* KeychainHelper.swift in Sources */,
 				A100000100000000000000040 /* SettingsWindowManager.swift in Sources */,
+				A100000100000000000000042 /* AudioFeedbackManager.swift in Sources */,
 				A100000100000000000000020 /* GlobalShortcut.swift in Sources */,
 				A100000100000000000000022 /* TextInserter.swift in Sources */,
 			);
@@ -320,7 +324,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.voicetotext.app.v2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voicetotext.talktotext;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -352,7 +356,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.voicetotext.app.v2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voicetotext.talktotext;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
