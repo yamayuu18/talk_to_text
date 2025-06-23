@@ -69,10 +69,15 @@ This is a native macOS menu bar application for speech-to-text conversion with A
 - Implements clipboard integration as backup method
 
 **SettingsView.swift** - SwiftUI settings interface
-- Three-tab interface: AI Models, API Keys, and Shortcuts
+- Form-based three-tab interface: AI Models, API Keys, and Shortcuts
 - Real-time AI provider and model selection
 - Multi-provider API key management with individual testing
-- Real-time shortcut customization with visual feedback
+- Real-time shortcut customization with immediate application
+
+**SettingsWindowManager.swift** - Dedicated settings window manager for menu bar apps
+- Creates resizable NSWindow (650x500 default, 500x400-1000x800 range)
+- Handles window lifecycle and proper memory management
+- Ensures single window instance with front-most display behavior
 
 ### Permission Requirements & Configuration Files
 The app requires several macOS permissions managed through entitlements and Info.plist:
@@ -109,10 +114,16 @@ The app is hardcoded for Japanese speech recognition (`Locale(identifier: "ja-JP
 GlobalShortcut uses Carbon framework EventHotKeyRef which requires manual memory management. The class properly handles registration/unregistration in init/deinit to prevent memory leaks.
 
 ### Text Insertion Strategies
-TextInserter implements multiple fallback mechanisms:
-1. CGEvent-based character simulation (primary)
-2. AppleScript keystroke automation (fallback)
-3. Clipboard-based paste operation (emergency fallback)
+TextInserter implements multiple fallback mechanisms with comprehensive error checking:
+1. CGEvent-based character simulation (primary) - sends Cmd+V to active application
+2. AppleScript keystroke automation (fallback) - alternative paste method
+3. Clipboard-based paste operation (emergency fallback) - manual paste required
+
+**Critical Implementation Notes:**
+- Always validates text is non-empty before clipboard operations to prevent corruption
+- Implements retry mechanism with clipboard verification
+- Preserves original speech text when AI processing returns empty results
+- Includes detailed debug logging for troubleshooting paste failures
 
 ### API Key Security
 AI service API keys (Gemini, OpenAI) are stored in UserDefaults (not Keychain). For production apps, consider migrating to Keychain for enhanced security.
@@ -144,6 +155,10 @@ Each major component defines custom error enums (e.g., AIServiceError, SpeechRec
 - **AI API Testing**: Use Settings panel "Test Current API Key" button to validate selected AI service
 - **Provider Switching**: Test switching between Gemini and OpenAI providers in Settings
 - **Permission Testing**: Check System Settings → Privacy & Security for required permissions
+- **Debug Console**: Monitor Console.app or Xcode debug area for detailed operational logs
+  - `MenuBarManager:` logs show AI processing and clipboard states
+  - `GlobalShortcut:` logs show shortcut registration/updates
+  - `TextInserter:` logs show accessibility permission and paste attempts
 
 ### Known Warnings & Issues
 - **Carbon API Deprecation**: `UTGetOSTypeFromString` warnings in GlobalShortcut.swift are expected - functionality still works on macOS 15+
@@ -151,20 +166,19 @@ Each major component defines custom error enums (e.g., AIServiceError, SpeechRec
 - **SwiftUI Settings**: If you see "Please use SettingsLink for opening the Settings scene" warnings, ensure proper Settings scene integration in menu bar apps
 
 ### Menu Bar App Settings Pattern
-For menu bar apps, open Settings using version-specific selectors:
+This app uses a dedicated SettingsWindowManager instead of SwiftUI Settings scene selectors:
 ```swift
 // In MenuBarManager.swift
-if #available(macOS 14.0, *) {
-    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-} else if #available(macOS 13.0, *) {
-    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)  
+@objc private func openSettings() {
+    settingsWindowManager.showSettings()
 }
 ```
+This approach avoids SwiftUI Settings scene warnings and provides better control over window behavior in menu bar applications.
 
 ### File Naming Consistency
 All files use `talk_to_text` naming (not `VoiceToText`). When creating new files, follow this pattern:
 - Project: `talk_to_text.xcodeproj`
-- Bundle ID: `com.voicetotext.app` 
+- Bundle ID: `com.voicetotext.app.v2` (updated to resolve accessibility permission issues)
 - Display name: "Talk to Text"
 
 ## AI Service Architecture

@@ -189,6 +189,10 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
+                Text("⚠️ Avoid system shortcuts like Cmd+C, Cmd+V, Ctrl+V, Cmd+Space, etc.")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                
                 HStack {
                     Text("Current Shortcut")
                     Spacer()
@@ -239,7 +243,6 @@ struct SettingsView: View {
                     modifiers: selectedModifiers,
                     keyCode: keyCode
                 )
-                print("Shortcut immediately applied: \(currentShortcutString)")
             }
         ))
         .onChange(of: selectedModifiers) { _ in updateStoredShortcut() }
@@ -286,7 +289,6 @@ struct SettingsView: View {
             modifiers: selectedModifiers,
             keyCode: KeyCodeHelper.codeFromKey(selectedKey) ?? 49
         )
-        print("Reset to default shortcut: \(currentShortcutString)")
     }
     
     private func testCurrentAPIKey() async {
@@ -464,11 +466,51 @@ class KeyCaptureView: NSView {
         }
         
         let keyCode = Int(event.keyCode)
+        
+        // Check for system reserved shortcuts
+        if isSystemReservedShortcut(modifiers: modifiers, keyCode: keyCode) {
+            NSSound.beep()
+            return
+        }
+        
         delegate?.keyCaptured(modifiers: modifiers, keyCode: keyCode)
     }
     
     override func flagsChanged(with event: NSEvent) {
         // Handle modifier-only combinations if needed
         super.flagsChanged(with: event)
+    }
+    
+    private func isSystemReservedShortcut(modifiers: Set<ModifierKey>, keyCode: Int) -> Bool {
+        // Common system shortcuts that should be avoided
+        let systemShortcuts: [(Set<ModifierKey>, Int)] = [
+            // Copy/Paste operations
+            ([.command], 8), // Cmd+C
+            ([.command], 9), // Cmd+V  
+            ([.command], 7), // Cmd+X
+            ([.control], 8), // Ctrl+C
+            ([.control], 9), // Ctrl+V
+            ([.control], 7), // Ctrl+X
+            
+            // Common system shortcuts
+            ([.command], 1), // Cmd+S
+            ([.command], 31), // Cmd+O
+            ([.command], 45), // Cmd+N
+            ([.command], 13), // Cmd+W
+            ([.command], 12), // Cmd+Q
+            ([.command], 6), // Cmd+Z
+            ([.command, .shift], 6), // Cmd+Shift+Z
+            
+            // Spotlight and system
+            ([.command], 49), // Cmd+Space
+        ]
+        
+        for (systemModifiers, systemKeyCode) in systemShortcuts {
+            if modifiers == systemModifiers && keyCode == systemKeyCode {
+                return true
+            }
+        }
+        
+        return false
     }
 }
