@@ -249,17 +249,25 @@ extension MenuBarManager: SpeechRecognizerDelegate {
                 // Insert into active application
                 print("Calling textInserter.insertText with: '\(text)'")
                 
+                // Check accessibility permission before attempting text insertion
+                self.textInserter.checkAccessibilityPermission()
+                
                 // Ensure we restore focus to the original app before text insertion
                 self.restorePreviousAppFocus {
                     self.textInserter.insertText(text)
                 }
                 
-                // Play success sound for raw text processing
-                self.audioFeedbackManager.playFeedback(.success)
+                // Play appropriate sound based on accessibility permission
+                if self.textInserter.hasAccessibilityPermission {
+                    // Success: text will be inserted automatically
+                    self.audioFeedbackManager.playFeedback(.success)
+                } else {
+                    // Warning: only copied to clipboard
+                    self.audioFeedbackManager.playFeedback(.processing)
+                }
                 
-                // Small delay to allow TextInserter to complete its work and re-check permissions
+                // Small delay to allow TextInserter to complete its work and update status
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    self.textInserter.checkAccessibilityPermission()
                     if self.textInserter.hasAccessibilityPermission {
                         self.updateStatus("Text inserted automatically! (Configure AI service for processing)")
                     } else {
