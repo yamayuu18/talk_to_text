@@ -183,73 +183,49 @@ struct SettingsView: View {
     }
     
     private var shortcutTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Global Shortcut")
-                    .font(.headline)
-                
-                Text("Press keys to set your recording shortcut")
+        Form {
+            Section(header: Text("Global Shortcut").font(.headline)) {
+                Text("Press keys to set your recording shortcut. At least one modifier (⌘, ⌥, ⌃, ⇧) is required.")
                     .font(.caption)
                     .foregroundColor(.secondary)
-            }
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Shortcut Recording")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                
+                HStack {
+                    Text("Current Shortcut")
+                    Spacer()
+                    Text(currentShortcutString.isEmpty ? "No shortcut set" : currentShortcutString)
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(6)
+                        .foregroundColor(currentShortcutString.isEmpty ? .secondary : .primary)
+                }
                 
                 Button(action: {
                     isWaitingForKeyPress.toggle()
                 }) {
                     HStack {
-                        Image(systemName: isWaitingForKeyPress ? "circle.fill" : "circle")
-                            .foregroundColor(isWaitingForKeyPress ? .red : .blue)
-                        Text(isWaitingForKeyPress ? "Press keys now..." : "Click to record shortcut")
+                        Image(systemName: isWaitingForKeyPress ? "record.circle.fill" : "record.circle")
+                            .foregroundColor(isWaitingForKeyPress ? .red : .accentColor)
+                        Text(isWaitingForKeyPress ? "Press keys now..." : "Click to Record New Shortcut")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(isWaitingForKeyPress ? Color.red.opacity(0.1) : Color.blue.opacity(0.1))
-                    .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
                 
                 if isWaitingForKeyPress {
-                    Text("Press your desired key combination now")
+                    Text("Press your desired key combination now. Changes apply immediately.")
                         .font(.caption)
                         .foregroundColor(.orange)
                         .italic()
                 }
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Current Shortcut")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Text(currentShortcutString.isEmpty ? "No shortcut set" : currentShortcutString)
-                    .font(.system(.title2, design: .monospaced))
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                    .foregroundColor(currentShortcutString.isEmpty ? .secondary : .primary)
-            }
-            
-            HStack {
-                Button("Apply Shortcut") {
-                    applyShortcut()
-                }
-                .disabled(selectedModifiers.isEmpty)
-                
-                Spacer()
-                
-                Button("Reset to Default") {
+            Section {
+                Button("Reset to Default (⌘ + ⇧ + Space)") {
                     resetToDefault()
                 }
             }
-            
-            Spacer()
         }
         .padding()
         .background(ShortcutCaptureView(
@@ -258,7 +234,12 @@ struct SettingsView: View {
                 selectedModifiers = modifiers
                 selectedKey = KeyCodeHelper.keyFromCode(keyCode) ?? "Space"
                 updateStoredShortcut()
-                applyShortcut()
+                // 即座にショートカットを適用
+                GlobalShortcut.shared?.updateShortcut(
+                    modifiers: selectedModifiers,
+                    keyCode: keyCode
+                )
+                print("Shortcut immediately applied: \(currentShortcutString)")
             }
         ))
         .onChange(of: selectedModifiers) { _ in updateStoredShortcut() }
@@ -296,18 +277,16 @@ struct SettingsView: View {
         shortcutKeyCode = KeyCodeHelper.codeFromKey(selectedKey) ?? 49 // Space
     }
     
-    private func applyShortcut() {
-        GlobalShortcut.shared?.updateShortcut(
-            modifiers: selectedModifiers,
-            keyCode: shortcutKeyCode
-        )
-    }
-    
     private func resetToDefault() {
         selectedModifiers = [.command, .shift]
         selectedKey = "Space"
         updateStoredShortcut()
-        applyShortcut()
+        // 即座にデフォルトショートカットを適用
+        GlobalShortcut.shared?.updateShortcut(
+            modifiers: selectedModifiers,
+            keyCode: KeyCodeHelper.codeFromKey(selectedKey) ?? 49
+        )
+        print("Reset to default shortcut: \(currentShortcutString)")
     }
     
     private func testCurrentAPIKey() async {

@@ -30,13 +30,24 @@ class TextInserter: ObservableObject {
     
     
     func insertText(_ text: String) {
-        guard !text.isEmpty else { return }
+        print("TextInserter: insertText called with: '\(text)' (length: \(text.count))")
+        guard !text.isEmpty else { 
+            print("TextInserter: Empty text provided, skipping insertion")
+            return 
+        }
         
         // Verify clipboard contents (should already be set by MenuBarManager)
         let pasteboard = NSPasteboard.general
-        if pasteboard.string(forType: .string) != text {
+        let currentClipboard = pasteboard.string(forType: .string) ?? ""
+        print("TextInserter: Current clipboard content: '\(currentClipboard)'")
+        
+        if currentClipboard != text {
+            print("TextInserter: Clipboard mismatch, updating clipboard")
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            print("TextInserter: Clipboard updated with: '\(text)'")
+        } else {
+            print("TextInserter: Clipboard already contains correct text")
         }
         
         // Check accessibility permission
@@ -47,6 +58,7 @@ class TextInserter: ObservableObject {
             return
         }
         
+        print("TextInserter: Starting text insertion process")
         // Enhanced delay for better stability and multiple retry attempts
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.sendPasteCommandWithRetry(text: text, retryCount: 0)
@@ -55,24 +67,31 @@ class TextInserter: ObservableObject {
     
     private func sendPasteCommandWithRetry(text: String, retryCount: Int) {
         let maxRetries = 3
+        print("TextInserter: Attempting paste (try \(retryCount + 1)/\(maxRetries + 1))")
+        
+        // リトライ前にクリップボードの状態を確認
+        let pasteboard = NSPasteboard.general
+        let clipboardContent = pasteboard.string(forType: .string) ?? ""
+        print("TextInserter: Clipboard verification before paste: '\(clipboardContent)'")
+        
         let success = sendPasteCommand()
         
         if !success && retryCount < maxRetries {
             print("TextInserter: Paste attempt \(retryCount + 1) failed, retrying...")
             
             // クリップボードを再設定
-            let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            print("TextInserter: Clipboard reset for retry with: '\(text)'")
             
             // 少し待ってからリトライ
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.sendPasteCommandWithRetry(text: text, retryCount: retryCount + 1)
             }
         } else if success {
-            print("TextInserter: Paste command sent successfully")
+            print("TextInserter: ✅ Paste command sent successfully on attempt \(retryCount + 1)")
         } else {
-            print("TextInserter: All paste attempts failed after \(maxRetries) retries")
+            print("TextInserter: ❌ All paste attempts failed after \(maxRetries + 1) tries")
         }
     }
     

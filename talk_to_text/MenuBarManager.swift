@@ -264,17 +264,39 @@ extension MenuBarManager: SpeechRecognizerDelegate {
             
             Task {
                 let result = await aiManager.processTextWithFallback(text)
+                
+                // 処理後のテキストが空でないことを確認
+                let finalText = result.result.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("MenuBarManager: AI processed text: '\(finalText)' (original: '\(result.result)', length: \(finalText.count))")
+
+                guard !finalText.isEmpty else {
+                    DispatchQueue.main.async {
+                        self.updateStatus("❌ AI processing resulted in empty text. Original speech kept in clipboard.")
+                        // 元の音声認識テキストをクリップボードに保存
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(text, forType: .string)
+                        print("MenuBarManager: Empty AI result - original text saved to clipboard: '\(text)'")
+                        
+                        // 3秒後にステータスをリセット
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            self.updateStatus("Ready")
+                        }
+                    }
+                    return // ここで処理を中断
+                }
                     
                 DispatchQueue.main.async {
                     // Copy to clipboard
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
-                    pasteboard.setString(result.result, forType: .string)
+                    pasteboard.setString(finalText, forType: .string)
+                    print("MenuBarManager: Final text copied to clipboard: '\(finalText)'")
                     
                     // Insert into active application
                     // Ensure we restore focus to the original app before text insertion
                     self.restorePreviousAppFocus {
-                        self.textInserter.insertText(result.result)
+                        self.textInserter.insertText(finalText)
                     }
                     
                     // Check if accessibility permission is granted for better status message

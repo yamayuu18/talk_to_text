@@ -43,15 +43,23 @@ class GlobalShortcut: ObservableObject {
     }
     
     func updateShortcut(modifiers: Set<ModifierKey>, keyCode: Int) {
+        print("GlobalShortcut: Updating shortcut - modifiers: \(modifiers), keyCode: \(keyCode)")
+        
         unregisterHotKey()
         
         currentModifiers = modifiers
         currentKeyCode = keyCode
         
+        // UserDefaultsに保存
         UserDefaults.standard.set(ModifierKey.toInt(modifiers), forKey: "shortcutModifiers")
         UserDefaults.standard.set(keyCode, forKey: "shortcutKeyCode")
+        UserDefaults.standard.synchronize() // 確実に保存
+        
+        print("GlobalShortcut: Saved to UserDefaults - modifiers: \(ModifierKey.toInt(modifiers)), keyCode: \(keyCode)")
         
         registerHotKey()
+        
+        print("GlobalShortcut: Current shortcut string: \(getCurrentShortcutString())")
     }
     
     private func registerHotKey() {
