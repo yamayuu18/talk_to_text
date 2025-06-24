@@ -50,28 +50,22 @@ struct SettingsView: View {
     }
     
     private var aiModelsTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("AI Provider")
-                    .font(.headline)
-                
+        Form {
+            Section(header: Text("AI Provider")) {
                 Picker("AI Provider", selection: $aiServiceManager.selectedProvider) {
                     ForEach(AIProvider.allCases) { provider in
                         Text(provider.displayName)
                             .tag(provider)
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
+                .pickerStyle(.segmented)
                 
                 Text("Choose your preferred AI service")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("AI Model")
-                    .font(.headline)
-                
+            Section(header: Text("AI Model")) {
                 Picker("AI Model", selection: $aiServiceManager.selectedModel) {
                     ForEach(aiServiceManager.availableModels) { model in
                         HStack {
@@ -85,17 +79,14 @@ struct SettingsView: View {
                         .tag(model)
                     }
                 }
-                .pickerStyle(MenuPickerStyle())
+                .pickerStyle(.menu)
                 
                 Text("Select the specific model for text processing")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Status")
-                    .font(.headline)
-                
+            Section(header: Text("Configuration Status")) {
                 HStack {
                     Image(systemName: aiServiceManager.isConfigured ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .foregroundColor(aiServiceManager.isConfigured ? .green : .orange)
@@ -103,27 +94,15 @@ struct SettingsView: View {
                     Text(aiServiceManager.isConfigured ? 
                          "\(aiServiceManager.currentProviderDisplayName) is configured" : 
                          "\(aiServiceManager.currentProviderDisplayName) requires API key")
-                        .font(.subheadline)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
             }
-            
-            Spacer()
         }
-        .padding()
     }
     
     private var apiKeysTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Gemini API Key")
-                    .font(.headline)
-                
+        Form {
+            Section(header: Text("Google Gemini")) {
                 SecureField("Enter your Gemini API key", text: $geminiAPIKey)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
                     .onChange(of: geminiAPIKey) { _ in
                         syncAPIKeysWithManager()
                     }
@@ -133,12 +112,8 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("OpenAI API Key")
-                    .font(.headline)
-                
+            Section(header: Text("OpenAI")) {
                 SecureField("Enter your OpenAI API key", text: $openaiAPIKey)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
                     .onChange(of: openaiAPIKey) { _ in
                         syncAPIKeysWithManager()
                     }
@@ -148,37 +123,36 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
             
-            HStack {
+            Section(header: Text("API Testing")) {
                 Button(action: {
                     Task {
                         await testCurrentAPIKey()
                     }
                 }) {
-                    if isTestingAPIKey {
-                        HStack {
+                    HStack {
+                        if isTestingAPIKey {
                             ProgressView()
                                 .controlSize(.small)
                             Text("Testing...")
+                        } else {
+                            Image(systemName: "checkmark.circle")
+                            Text("Test Current API Key")
                         }
-                    } else {
-                        Text("Test Current API Key")
                     }
                 }
                 .disabled(!aiServiceManager.isConfigured || isTestingAPIKey)
-                
-                Spacer()
-                
-                Button("Clear All") {
+            }
+            
+            Section {
+                Button("Clear All API Keys") {
                     geminiAPIKey = ""
                     openaiAPIKey = ""
                     syncAPIKeysWithManager()
                 }
+                .foregroundColor(.red)
                 .disabled(geminiAPIKey.isEmpty && openaiAPIKey.isEmpty)
             }
-            
-            Spacer()
         }
-        .padding()
         .alert("API Key Test Result", isPresented: .constant(apiKeyTestResult != nil)) {
             Button("OK") { 
                 apiKeyTestResult = nil
@@ -190,7 +164,7 @@ struct SettingsView: View {
     
     private var shortcutTab: some View {
         Form {
-            Section(header: Text("Global Shortcut").font(.headline)) {
+            Section(header: Text("Shortcut Configuration")) {
                 Text("Press keys to set your recording shortcut. At least one modifier (⌘, ⌥, ⌃, ⇧) is required.")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -198,9 +172,11 @@ struct SettingsView: View {
                 Text("⚠️ Avoid system shortcuts like Cmd+C, Cmd+V, Ctrl+V, Cmd+Space, etc.")
                     .font(.caption2)
                     .foregroundColor(.orange)
-                
+            }
+            
+            Section(header: Text("Current Assignment")) {
                 HStack {
-                    Text("Current Shortcut")
+                    Text("Active Shortcut")
                     Spacer()
                     Text(currentShortcutString.isEmpty ? "No shortcut set" : currentShortcutString)
                         .font(.system(.body, design: .monospaced))
@@ -218,10 +194,9 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: isWaitingForKeyPress ? "record.circle.fill" : "record.circle")
                             .foregroundColor(isWaitingForKeyPress ? .red : .accentColor)
-                        Text(isWaitingForKeyPress ? "Press keys now..." : "Click to Record New Shortcut")
+                        Text(isWaitingForKeyPress ? "Press keys now..." : "Record New Shortcut")
                     }
                 }
-                .buttonStyle(PlainButtonStyle())
                 
                 if isWaitingForKeyPress {
                     Text("Press your desired key combination now. Changes apply immediately.")
@@ -231,13 +206,12 @@ struct SettingsView: View {
                 }
             }
             
-            Section {
+            Section(header: Text("Reset Options")) {
                 Button("Reset to Default (⌘ + ⇧ + Space)") {
                     resetToDefault()
                 }
             }
         }
-        .padding()
         .background(ShortcutCaptureView(
             isCapturing: $isWaitingForKeyPress,
             onShortcutCaptured: { modifiers, keyCode in
@@ -257,72 +231,94 @@ struct SettingsView: View {
     
     private var audioFeedbackTab: some View {
         Form {
-            Section(header: Text("Audio Feedback Settings").font(.headline)) {
-                HStack {
-                    Toggle("Enable Audio Feedback", isOn: $audioFeedbackManager.isSoundEnabled)
-                    Spacer()
-                }
-                .help("Play sounds for different app states (start, stop, success, error)")
+            Section(header: Text("Audio Feedback Settings")) {
+                Toggle("Enable Audio Feedback", isOn: $audioFeedbackManager.isSoundEnabled)
+                    .help("Play sounds for different app states (start, stop, success, error)")
                 
                 if audioFeedbackManager.isSoundEnabled {
-                    VStack(alignment: .leading, spacing: 12) {
+                    HStack {
                         Text("Volume")
-                            .font(.subheadline)
-                        
-                        HStack {
+                        Spacer()
+                        HStack(spacing: 8) {
                             Image(systemName: "speaker.1")
                                 .foregroundColor(.secondary)
                             Slider(value: $audioFeedbackManager.feedbackVolume, in: 0.0...1.0, step: 0.1)
+                                .frame(width: 120)
                             Image(systemName: "speaker.3")
                                 .foregroundColor(.secondary)
+                            Text("\(Int(audioFeedbackManager.feedbackVolume * 100))%")
+                                .frame(width: 35, alignment: .trailing)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Text("Volume: \(Int(audioFeedbackManager.feedbackVolume * 100))%")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                     }
-                    .padding(.leading, 20)
                 }
             }
             
-            Section(header: Text("Sound Preview").font(.headline)) {
-                VStack(spacing: 8) {
-                    Button("🔴 Recording Start Sound") {
-                        audioFeedbackManager.playFeedback(.recordStart)
+            Section(header: Text("Sound Preview")) {
+                Button(action: {
+                    audioFeedbackManager.playFeedback(.recordStart)
+                }) {
+                    HStack {
+                        Text("🔴")
+                        Text("Recording Start Sound")
+                        Spacer()
                     }
-                    .disabled(!audioFeedbackManager.isSoundEnabled)
-                    
-                    Button("⏹️ Recording Stop Sound") {
-                        audioFeedbackManager.playFeedback(.recordStop)
-                    }
-                    .disabled(!audioFeedbackManager.isSoundEnabled)
-                    
-                    Button("⚙️ Processing Sound") {
-                        audioFeedbackManager.playFeedback(.processing)
-                    }
-                    .disabled(!audioFeedbackManager.isSoundEnabled)
-                    
-                    Button("✅ Success Sound") {
-                        audioFeedbackManager.playFeedback(.success)
-                    }
-                    .disabled(!audioFeedbackManager.isSoundEnabled)
-                    
-                    Button("❌ Error Sound") {
-                        audioFeedbackManager.playFeedback(.error)
-                    }
-                    .disabled(!audioFeedbackManager.isSoundEnabled)
                 }
-                .buttonStyle(PlainButtonStyle())
+                .disabled(!audioFeedbackManager.isSoundEnabled)
+                
+                Button(action: {
+                    audioFeedbackManager.playFeedback(.recordStop)
+                }) {
+                    HStack {
+                        Text("⏹️")
+                        Text("Recording Stop Sound")
+                        Spacer()
+                    }
+                }
+                .disabled(!audioFeedbackManager.isSoundEnabled)
+                
+                Button(action: {
+                    audioFeedbackManager.playFeedback(.processing)
+                }) {
+                    HStack {
+                        Text("⚙️")
+                        Text("Processing Sound")
+                        Spacer()
+                    }
+                }
+                .disabled(!audioFeedbackManager.isSoundEnabled)
+                
+                Button(action: {
+                    audioFeedbackManager.playFeedback(.success)
+                }) {
+                    HStack {
+                        Text("✅")
+                        Text("Success Sound")
+                        Spacer()
+                    }
+                }
+                .disabled(!audioFeedbackManager.isSoundEnabled)
+                
+                Button(action: {
+                    audioFeedbackManager.playFeedback(.error)
+                }) {
+                    HStack {
+                        Text("❌")
+                        Text("Error Sound")
+                        Spacer()
+                    }
+                }
+                .disabled(!audioFeedbackManager.isSoundEnabled)
             }
             
-            Section {
-                Button("Reset to Defaults") {
+            Section(header: Text("Reset Options")) {
+                Button("Reset to Default Settings") {
                     audioFeedbackManager.resetToDefaults()
                 }
                 .foregroundColor(.orange)
             }
         }
-        .padding()
     }
     
     private var currentShortcutString: String {
